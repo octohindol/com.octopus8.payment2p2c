@@ -151,18 +151,20 @@ function payment2c2p_civicrm_themes(&$themes) {
 //}
 
 /**
- * Implements hook_civicrm_navigationMenu().
+ * Implements hook_civicrm_navigationMenu()
  *
- * @link https://docs.civicrm.org/dev/en/latest/hooks/hook_civicrm_navigationMenu
+ * @param array $menu
+ * @return void
  */
-//function payment2c2p_civicrm_navigationMenu(&$menu) {
-//  _payment2c2p_civix_insert_navigation_menu($menu, 'Mailings', [
-//    'label' => E::ts('New subliminal message'),
-//    'name' => 'mailing_subliminal_message',
-//    'url' => 'civicrm/mailing/subliminal',
-//    'permission' => 'access CiviMail',
-//    'operator' => 'OR',
-//    'separator' => 0,
-//  ]);
-//  _payment2c2p_civix_navigationMenu($menu);
-//}
+function payment2c2p_civicrm_navigationMenu(&$menu) {
+    _payment2c2p_civix_insert_navigation_menu($menu, 'Administer/CiviContribute', [
+        'label' => E::ts('2c2p Settings'),
+        'name' => '2c2p_settings',
+        'url' => 'civicrm/payment2c2p/settings',
+        'permission' => 'administer CiviCRM',
+        'operator' => 'OR',
+        'has_separator' => 1,
+        'is_active' => 1,
+    ]);
+    _redsys_civix_navigationMenu($menu);
+}
