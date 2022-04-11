@@ -2,7 +2,8 @@
 
 ini_set('memory_limit', '2G');
 // phpcs:disable
-eval(cv('php:boot --level=classloader', 'phpcode'));
+//eval(cv('php:boot --level=classloader', 'phpcode'));
+eval(cv('php:boot --level=full', 'phpcode'));
 // phpcs:enable
 // Allow autoloading of PHPUnit helper classes in this extension.
 $loader = new \Composer\Autoload\ClassLoader();

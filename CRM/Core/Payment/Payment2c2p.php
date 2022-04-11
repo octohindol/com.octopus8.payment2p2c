@@ -277,7 +277,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment {
 
     CRM_Utils_Hook::alterPaymentProcessorParams($this, $params, $payflow_query_array);
     $payflow_query = $this->convert_to_nvp($payflow_query_array);
-
+    CRM_Core_Error::debug_var('payflow_query', $payflow_query);
     /*
      * Check to see if we have a duplicate before we send
      */
@@ -294,6 +294,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment {
      * Payment successfully sent to gateway - process the response now
      */
     $result = strstr($responseData, 'RESULT');
+    CRM_Core_Error::debug_var('result', $result);
+
     if (empty($result)) {
       throw new PaymentProcessorException('No RESULT code from PayPal.', 9016);
     }
