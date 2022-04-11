@@ -1,0 +1,15 @@
+{
+    "name": "civicrm/payment2c2p",
+    "description": "This is a 2c2p Payment Processor for CiviCRM.",
+    "license": "AGPL-3.0-only",
+    "authors": [
+        {
+            "name": "Khindol Madraimov",
+            "email": "hindol@octopus8.com"
+        }
+    ],
+    "require": {
+        "firebase/php-jwt": "^5.1",
+        "ext-json": "*"
+    }
+}

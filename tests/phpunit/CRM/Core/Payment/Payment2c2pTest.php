@@ -32,7 +32,7 @@ class CRM_Core_Payment_Payment2c2pTest extends \PHPUnit\Framework\TestCase imple
   }
 
   public function setUp(): void {
-    $this->setUpPayflowProcessor();
+    $this->setUpPayment2c2pProcessor();
     $this->processor = \Civi\Payment\System::singleton()->getById($this->ids['PaymentProcessor']['Payment2c2p']);
     parent::setUp();
   }
@@ -42,92 +42,176 @@ class CRM_Core_Payment_Payment2c2pTest extends \PHPUnit\Framework\TestCase imple
     parent::tearDown();
   }
 
+    public function _testVersion()
+    {
+        $version = $this->processor->getCurrentVersion();
+        $this->assertSame('8.5', $this->processor->getCurrentVersion());
+        return $version;
+    }
+
+    public function _testSubmitTransaction()
+    {
+        $submiturl = "";
+        $payment_query = "";
+        $request = $this->processor->submit_transaction();
+
+        $this->assertSame('8.5', $this->processor->getCurrentVersion());
+        return $request;
+    }
+    public function _testPaymentTokenRequest()
+    {
+        $merchantId = 'JT01';		//Get MerchantID when opening account with 2C2P
+        $secretKey = 'ECC4E54DBA738857B84A7EBC6B5DC7187B8DA68750E88AB53AAA41F548D6F2D9';	//Get SecretKey from 2C2P PGW Dashboard
+        $invoiceNo = '1523953661';
+        $description = 'item 1';
+        $amount = 1000.00;
+        $currencyCode = 'SGD';
+        $payload = $this->processor->getPaymentTokenRequest($secretKey, $merchantId, $invoiceNo, $description, $amount, $currencyCode);
+        $this->assertSame('{"payload":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJtZXJjaGFudElEIjoiSlQwMSIsImludm9pY2VObyI6IjE1MjM5NTM2NjEiLCJkZXNjcmlwdGlvbiI6Iml0ZW0gMSIsImFtb3VudCI6MTAwMCwiY3VycmVuY3lDb2RlIjoiU0dEIn0.uf01i3faxJhHR7kN6DP9oHcGd3rERvPDC6K9NzINBMU"}', $payload);
+        return $payload;
+    }
+
+    public function _testPaymentTokenResponse()
+    {
+        $response = '{"payload":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJtZXJjaGFudElEIjoiSlQwMSIsImludm9pY2VObyI6IjE1MjM5NTM2NjEiLCJkZXNjcmlwdGlvbiI6Iml0ZW0gMSIsImFtb3VudCI6MTAwMCwiY3VycmVuY3lDb2RlIjoiU0dEIn0.uf01i3faxJhHR7kN6DP9oHcGd3rERvPDC6K9NzINBMU"}';
+        $secretKey = 'ECC4E54DBA738857B84A7EBC6B5DC7187B8DA68750E88AB53AAA41F548D6F2D9';	//Get SecretKey from 2C2P PGW Dashboard
+        $payload = $this->processor->getPaymentTokenResponse($secretKey, $response);
+        print_r($payload);
+        $this->assertSame('0000', $payload['respCode']);
+        return $payload;
+    }
+
+    public function testPaymentTokenRequestResponse()
+    {
+        $merchantId = 'JT01';		//Get MerchantID when opening account with 2C2P
+        $secretKey = 'ECC4E54DBA738857B84A7EBC6B5DC7187B8DA68750E88AB53AAA41F548D6F2D9';	//Get SecretKey from 2C2P PGW Dashboard
+        $invoiceNo = '1523953661';
+        $description = 'item 1';
+        $amount = 1000.00;
+        $currencyCode = 'SGD';
+        $url = 'https://sandbox-pgw.2c2p.com/payment/4.1/PaymentToken';
+        $payload = $this->processor->getPaymentPayload($secretKey, $merchantId, $invoiceNo, $description, $amount, $currencyCode);
+        print_r($payload);
+        $encodedTokenResponse = $this->processor->getEncodedTokenResponse($url, $payload);
+        print_r($encodedTokenResponse);
+        $decodedTokenResponse = $this->processor->getDecodedTokenResponse($secretKey, $encodedTokenResponse);
+        print_r($decodedTokenResponse);
+        $this->assertSame('0000', $decodedTokenResponse['respCode']);
+        return $decodedTokenResponse;
+    }
+
+    /**
+   * Test making a call to 2c2p
+   */
+//  public function testSinglePayment(): void {
+//    $this->setupMockHandler();
+//    $params = $this->getBillingParams();
+//    $params['amount'] = 20.00;
+//    $params['currency'] = 'AUD';
+//    $params['description'] = 'Test Contribution';
+//    $params['invoiceID'] = 'xyz';
+//    $params['email'] = 'unittesteway@civicrm.org';
+//    $params['ip_address'] = '127.0.0.1';
+//    foreach ($params as $key => $value) {
+//      // Paypal is super special and requires this. Leaving out of the more generic
+//      // get billing params for now to make it more obvious.
+//      // When/if PropertyBag supports all the params paypal needs we can convert & simplify this.
+//      $params[str_replace('-5', '', str_replace('billing_', '', $key))] = $value;
+//    }
+//    $params['state_province'] = 'NSW';
+//    $params['country'] = 'AUS';
+//    $params['contributionType_accounting_code'] = 4200;
+//    $params['installments'] = 1;
+//    $this->processor->doPayment($params);
+//    $this->assertEquals($this->getExpectedSinglePaymentRequests(), $this->getRequestBodies());
+//  }
+
   /**
    * Test making a once off payment
    */
-  public function testSinglePayment(): void {
-    $this->setupMockHandler();
-    $params = $this->getBillingParams();
-    $params['amount'] = 20.00;
-    $params['currency'] = 'AUD';
-    $params['description'] = 'Test Contribution';
-    $params['invoiceID'] = 'xyz';
-    $params['email'] = 'unittesteway@civicrm.org';
-    $params['ip_address'] = '127.0.0.1';
-    foreach ($params as $key => $value) {
-      // Paypal is super special and requires this. Leaving out of the more generic
-      // get billing params for now to make it more obvious.
-      // When/if PropertyBag supports all the params paypal needs we can convert & simplify this.
-      $params[str_replace('-5', '', str_replace('billing_', '', $key))] = $value;
-    }
-    $params['state_province'] = 'NSW';
-    $params['country'] = 'AUS';
-    $params['contributionType_accounting_code'] = 4200;
-    $params['installments'] = 1;
-    $this->processor->doPayment($params);
-    $this->assertEquals($this->getExpectedSinglePaymentRequests(), $this->getRequestBodies());
-  }
-
+//  public function testSinglePayment(): void {
+//    $this->setupMockHandler();
+//    $params = $this->getBillingParams();
+//    $params['amount'] = 20.00;
+//    $params['currency'] = 'AUD';
+//    $params['description'] = 'Test Contribution';
+//    $params['invoiceID'] = 'xyz';
+//    $params['email'] = 'unittesteway@civicrm.org';
+//    $params['ip_address'] = '127.0.0.1';
+//    foreach ($params as $key => $value) {
+//      // Paypal is super special and requires this. Leaving out of the more generic
+//      // get billing params for now to make it more obvious.
+//      // When/if PropertyBag supports all the params paypal needs we can convert & simplify this.
+//      $params[str_replace('-5', '', str_replace('billing_', '', $key))] = $value;
+//    }
+//    $params['state_province'] = 'NSW';
+//    $params['country'] = 'AUS';
+//    $params['contributionType_accounting_code'] = 4200;
+//    $params['installments'] = 1;
+//    $this->processor->doPayment($params);
+//    $this->assertEquals($this->getExpectedSinglePaymentRequests(), $this->getRequestBodies());
+//  }
+//
   /**
    * Test making a recurring payment
    */
-  public function testRecuringPayment(): void {
-    $this->setupMockHandler(NULL, FALSE, TRUE);
-    $params = $this->getBillingParams();
-    $params['amount'] = 20.00;
-    $params['currency'] = 'AUD';
-    $params['description'] = 'Test Contribution';
-    $params['invoiceID'] = 'xyz';
-    $params['email'] = 'unittesteway@civicrm.org';
-    $params['ip_address'] = '127.0.0.1';
-    foreach ($params as $key => $value) {
-      // Paypal is super special and requires this. Leaving out of the more generic
-      // get billing params for now to make it more obvious.
-      // When/if PropertyBag supports all the params paypal needs we can convert & simplify this.
-      $params[str_replace('-5', '', str_replace('billing_', '', $key))] = $value;
-    }
-    $params['state_province'] = 'NSW';
-    $params['country'] = 'AUS';
-    $params['contributionType_accounting_code'] = 4200;
-    $params['installments'] = 13;
-    $params['is_recur'] = 1;
-    $params['frequency_unit'] = 'month';
-    $params['frequency_interval'] = 1;
-    $this->processor->doPayment($params);
-    $this->assertEquals($this->getExpectedRecuringPaymentRequests(), $this->getRequestBodies());
-  }
+//  public function testRecuringPayment(): void {
+//    $this->setupMockHandler(NULL, FALSE, TRUE);
+//    $params = $this->getBillingParams();
+//    $params['amount'] = 20.00;
+//    $params['currency'] = 'AUD';
+//    $params['description'] = 'Test Contribution';
+//    $params['invoiceID'] = 'xyz';
+//    $params['email'] = 'unittesteway@civicrm.org';
+//    $params['ip_address'] = '127.0.0.1';
+//    foreach ($params as $key => $value) {
+//      // Paypal is super special and requires this. Leaving out of the more generic
+//      // get billing params for now to make it more obvious.
+//      // When/if PropertyBag supports all the params paypal needs we can convert & simplify this.
+//      $params[str_replace('-5', '', str_replace('billing_', '', $key))] = $value;
+//    }
+//    $params['state_province'] = 'NSW';
+//    $params['country'] = 'AUS';
+//    $params['contributionType_accounting_code'] = 4200;
+//    $params['installments'] = 13;
+//    $params['is_recur'] = 1;
+//    $params['frequency_unit'] = 'month';
+//    $params['frequency_interval'] = 1;
+//    $this->processor->doPayment($params);
+//    $this->assertEquals($this->getExpectedRecuringPaymentRequests(), $this->getRequestBodies());
+//  }
 
   /**
    * Test making a failed once off payment
    */
-  public function testErrorSinglePayment(): void {
-    $this->setupMockHandler(NULL, TRUE);
-    $params = $this->getBillingParams();
-    $params['amount'] = 20.00;
-    $params['currency'] = 'AUD';
-    $params['description'] = 'Test Contribution';
-    $params['invoiceID'] = 'xyz';
-    $params['email'] = 'unittesteway@civicrm.org';
-    $params['ip_address'] = '127.0.0.1';
-    foreach ($params as $key => $value) {
-      // Paypal is super special and requires this. Leaving out of the more generic
-      // get billing params for now to make it more obvious.
-      // When/if PropertyBag supports all the params paypal needs we can convert & simplify this.
-      $params[str_replace('-5', '', str_replace('billing_', '', $key))] = $value;
-    }
-    $params['state_province'] = 'NSW';
-    $params['country'] = 'AUS';
-    $params['contributionType_accounting_code'] = 4200;
-    $params['installments'] = 1;
-    try {
-      $this->processor->doPayment($params);
-      $this->fail('Test was meant to throw an exception');
-    }
-    catch (\Civi\Payment\Exception\PaymentProcessorException $e) {
-      $this->assertEquals('Your transaction was declined   ', $e->getMessage());
-      $this->assertEquals(9009, $e->getErrorCode());
-    }
-  }
+//  public function testErrorSinglePayment(): void {
+//    $this->setupMockHandler(NULL, TRUE);
+//    $params = $this->getBillingParams();
+//    $params['amount'] = 2220.00;
+//    $params['currency'] = 'AUD';
+//    $params['description'] = 'Test Contribution';
+//    $params['invoiceID'] = 'xyz';
+//    $params['email'] = 'unittesteway@civicrm.org';
+//    $params['ip_address'] = '127.0.0.1';
+//    foreach ($params as $key => $value) {
+//      // Paypal is super special and requires this. Leaving out of the more generic
+//      // get billing params for now to make it more obvious.
+//      // When/if PropertyBag supports all the params paypal needs we can convert & simplify this.
+//      $params[str_replace('-5', '', str_replace('billing_', '', $key))] = $value;
+//    }
+//    $params['state_province'] = 'NSW';
+//    $params['country'] = 'AUS';
+//    $params['contributionType_accounting_code'] = 4200;
+//    $params['installments'] = 1;
+//    try {
+//      $this->processor->doPayment($params);
+//      $this->fail('Test was meant to throw an exception');
+//    }
+//    catch (\Civi\Payment\Exception\PaymentProcessorException $e) {
+//      $this->assertEquals('Your transaction was declined   ', $e->getMessage());
+//      $this->assertEquals(9009, $e->getErrorCode());
+//    }
+//  }
 
   /**
    * Get some basic billing parameters.
@@ -158,11 +242,11 @@ class CRM_Core_Payment_Payment2c2pTest extends \PHPUnit\Framework\TestCase imple
     ];
   }
 
-  public function setUpPayflowProcessor(): void {
+  public function setUpPayment2c2pProcessor(): void {
     $paymentProcessorType = $this->callAPISuccess('PaymentProcessorType', 'get', ['name' => 'Payment2c2p']);
     $this->callAPISuccess('PaymentProcessorType', 'create', ['id' => $paymentProcessorType['id'], 'is_active' => 1]);
     $params = [
-      'name' => 'demo',
+      'name' => 'demoPayment2c2p',
       'domain_id' => CRM_Core_Config::domainID(),
       'payment_processor_type_id' => 'Payment2c2p',
       'is_active' => 1,
@@ -171,7 +255,7 @@ class CRM_Core_Payment_Payment2c2pTest extends \PHPUnit\Framework\TestCase imple
       'user_name' => 'test',
       'password' => 'test1234',
       'url_site' => 'https://pilot-Payflowpro.paypal.com',
-      'class_name' => 'Payment_PayflowPro',
+      'class_name' => 'Payment_Payment2c2p',
       'billing_mode' => 1,
       'financial_type_id' => 1,
       'financial_account_id' => 12,
@@ -206,7 +290,11 @@ class CRM_Core_Payment_Payment2c2pTest extends \PHPUnit\Framework\TestCase imple
     if ($id) {
       $this->processor = Civi\Payment\System::singleton()->getById($id);
     }
-    $responses = $error ? $this->getExpectedSinglePaymentErrorResponses() : ($recurring ? $this->getExpectedRecurringPaymentResponses() : $this->getExpectedSinglePaymentResponses());
+    $responses = $error ?
+        $this->getExpectedSinglePaymentErrorResponses() :
+        ($recurring
+            ? $this->getExpectedRecurringPaymentResponses()
+            : $this->getExpectedSinglePaymentResponses());
     // Comment the next line out when trying to capture the response.
     // see https://github.com/civicrm/civicrm-core/pull/18350
 //    $this->createMockHandler($responses);
