@@ -85,15 +85,15 @@ class CRM_Core_Payment_Payment2c2pTest extends \PHPUnit\Framework\TestCase imple
     {
         $merchantId = 'JT01';		//Get MerchantID when opening account with 2C2P
         $secretKey = 'ECC4E54DBA738857B84A7EBC6B5DC7187B8DA68750E88AB53AAA41F548D6F2D9';	//Get SecretKey from 2C2P PGW Dashboard
-        $invoiceNo = '1523953661';
+        $invoiceNo = time();
         $description = 'item 1';
         $amount = 1000.00;
         $currencyCode = 'SGD';
         $url = 'https://sandbox-pgw.2c2p.com/payment/4.1/PaymentToken';
         $payload = $this->processor->getPaymentPayload($secretKey, $merchantId, $invoiceNo, $description, $amount, $currencyCode);
-        print_r($payload);
+//        print_r($payload);
         $encodedTokenResponse = $this->processor->getEncodedTokenResponse($url, $payload);
-        print_r($encodedTokenResponse);
+//        print_r($encodedTokenResponse);
         $decodedTokenResponse = $this->processor->getDecodedTokenResponse($secretKey, $encodedTokenResponse);
         print_r($decodedTokenResponse);
         $this->assertSame('0000', $decodedTokenResponse['respCode']);
