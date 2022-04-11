@@ -166,5 +166,5 @@ function payment2c2p_civicrm_navigationMenu(&$menu) {
         'has_separator' => 1,
         'is_active' => 1,
     ]);
-    _redsys_civix_navigationMenu($menu);
+    _payment2c2p_civix_navigationMenu($menu);
 }
