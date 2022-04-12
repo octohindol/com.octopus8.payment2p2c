@@ -105,12 +105,18 @@ class CRM_Payment2c2p_PaymentTokenRequest
     public static function getEncodedTokenResponse(string $url, string $payload): string
     {
         $client = new Client();
+        $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Guzzle';
+
 
         $response = $client->request('POST', $url, [
             'body' => $payload,
+            'user_agent' => $user_agent,
             'headers' => [
                 'Accept' => 'text/plain',
                 'Content-Type' => 'application/*+json',
+                'X-VPS-Timeout' => '45',
+                'X-VPS-VIT-Integration-Product' => 'CiviCRM',
+                'X-VPS-Request-ID' => strval(rand(1, 1000000000)),
             ],
         ]);
         return $response->getBody();

@@ -160,6 +160,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $returnUrl = $this->getReturnUrl($processor_name, $params, $component);
 
         $frontendReturnUrl = $returnUrl;
+//        CRM_Core_Error::debug_var('frontendReturnUrl', $frontendReturnUrl);
         $payload = $this->getPaymentPayload($secretKey,
             $merchantId,
             $invoiceNo,
@@ -167,9 +168,9 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             $amount,
             $currency,
             $frontendReturnUrl);
-        CRM_Core_Error::debug_var('payload', $payload);
+//        CRM_Core_Error::debug_var('payload', $payload);
         $encodedTokenResponse = $this->getEncodedTokenResponse($url, $payload);
-        CRM_Core_Error::debug_var('encodedTokenResponse', $encodedTokenResponse);
+//        CRM_Core_Error::debug_var('encodedTokenResponse', $encodedTokenResponse);
         $decodedTokenResponse = $this->getDecodedTokenResponse($secretKey, $encodedTokenResponse);
         $webPaymentUrl = $decodedTokenResponse['webPaymentUrl'];
         // Print the tpl to redirect and send POST variables to RedSys Getaway.
@@ -196,59 +197,57 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     {
 //        CRM_Core_Error::debug_var('request', $_REQUEST);
 //        CRM_Core_Error::debug_var('post', $_POST);
-        $paymentResponse = $_POST['$paymentResponse'];
-
+        $payloadResponse = $_REQUEST['paymentResponse'];
         require_once 'CRM/Utils/Array.php';
+        $paymentResponse = CRM_Payment2c2p_PaymentTokenRequest::getDecodedPayload64($payloadResponse);
+//        CRM_Core_Error::debug_var('paymentResponse', $paymentResponse);
 
         $module = CRM_Utils_Array::value('md', $_GET);
         $qfKey = CRM_Utils_Array::value('qfKey', $_GET);
         $invoiceId = CRM_Utils_Array::value('inId', $_GET);
-        $orderId = CRM_Utils_Array::value('orderId', $_GET);
-
+        $orderId = substr($invoiceId, 0, 15);
+        $url = CRM_Utils_System::url('civicrm');
         switch ($module) {
             case 'contribute':
+                $url = CRM_Utils_System::url('civicrm/contribute');
                 if ($paymentResponse['respCode'] == 2000) {
                     $query = "UPDATE civicrm_contribution SET trxn_id='" . $orderId . "', contribution_status_id=1 where invoice_id='" . $invoiceId . "'";
                     CRM_Core_DAO::executeQuery($query);
-                    $url = CRM_Utils_System::url('civicrm/contribute/transact', "_qf_ThankYou_display=1&qfKey={$qfKey}", FALSE, NULL, FALSE
-                    );
                 } else {
-                    CRM_Core_Session::setStatus(ts($_POST['respDesc']), ts('2c2p Error:'), 'error');
-                    $url = CRM_Utils_System::url('civicrm/contribute/transact', "_qf_Confirm_display=true&qfKey={$qfKey}", FALSE, NULL, FALSE
-                    );
+                    $query = "UPDATE civicrm_contribution SET trxn_id='" . $orderId . "', contribution_status_id=4 where invoice_id='" . $invoiceId . "'";
+                    CRM_Core_DAO::executeQuery($query);
+                    CRM_Core_Error::statusBounce(ts($_POST['respDesc']) . ts('2c2p Error:') . 'error', $url, 'error');
+                    return FALSE;
                 }
 
                 break;
 
             case 'event':
+                $url = CRM_Utils_System::url('civicrm/event');
 
                 if ($paymentResponse['respCode'] == 2000) { // success code
                     $participantId = CRM_Utils_Array::value('pid', $_GET);
                     $eventId = CRM_Utils_Array::value('eid', $_GET);
-
                     $query = "UPDATE civicrm_participant SET status_id = 1 where id =" . $participantId . " AND event_id=" . $eventId;
                     CRM_Core_DAO::executeQuery($query);
-
                     $query = "UPDATE civicrm_contribution SET trxn_id='" . $orderId . "', contribution_status_id=1 where invoice_id='" . $invoiceId . "'";
-
                     CRM_Core_DAO::executeQuery($query);
 
-                    $url = CRM_Utils_System::url('civicrm/event/register', "_qf_ThankYou_display=1&qfKey={$qfKey}", FALSE, NULL, FALSE
-                    );
                 } else { // error code
-                    CRM_Core_Session::setStatus(ts($_POST['respDesc']), ts('2c2p Error:'), 'error');
-                    $url = CRM_Utils_System::url('civicrm/event/register', "_qf_Confirm_display=true&qfKey={$qfKey}", FALSE, NULL, FALSE
-                    );
+                    $query = "UPDATE civicrm_contribution SET trxn_id='" . $orderId . "', contribution_status_id=4 where invoice_id='" . $invoiceId . "'";
+                    CRM_Core_DAO::executeQuery($query);
+                    CRM_Core_Error::statusBounce(ts($_POST['respDesc']) . ts('2c2p Error:') . 'error', $url, 'error');
+                    return FALSE;
                 }
 
                 break;
 
             default:
-                require_once 'CRM/Core/Error.php';
-                CRM_Core_Error::debug_log_message("Could not get module name from request url");
-                echo "Could not get module name from request url\r\n";
+                CRM_Core_Error::statusBounce("Could not get module name from request url", $url);
         }
+
         CRM_Utils_System::redirect($url);
+        return TRUE;
     }
 
 
@@ -293,7 +292,6 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 
     public function getEncodedTokenResponse($url, $payload)
     {
-
         return CRM_Payment2c2p_PaymentTokenRequest::getEncodedTokenResponse($url, $payload);
     }
 
