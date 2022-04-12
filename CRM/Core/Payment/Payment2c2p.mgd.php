@@ -20,10 +20,10 @@ return [
             'subject_label' => 'User',
             'class_name' => 'Payment_Payment2c2p',
             'billing_mode' => 4,
-            'url_site_default' => 'https://2c2p.com/payment/4.1/',
+            'url_site_default' => 'https://sandbox-pgw.2c2p.com/payment/4.1/PaymentToken',
             'payment_type' => 1,
             'is_recur' => 0,
-            'url_site_test_default' => 'https://sandbox-pgw.2c2p.com/payment/4.1/',
+            'url_site_test_default' => 'https://sandbox-pgw.2c2p.com/payment/4.1/PaymentToken',
         ],
     ],
 ];

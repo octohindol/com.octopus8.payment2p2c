@@ -82,11 +82,11 @@ class CRM_Payment2c2p_PaymentTokenRequest
      */
     public static function getDecodedTokenResponse($secretkey, $response, $responsetype = 'payload'): array
     {
-        CRM_Core_Error::debug_var('response', $response);
+//        CRM_Core_Error::debug_var('response', $response);
 //        CRM_Core_Error::debug_var('paymentProcessor', $this->_paymentProcessor);
 
         $decoded = json_decode($response, true);
-        CRM_Core_Error::debug_var('decoded', $decoded);
+//        CRM_Core_Error::debug_var('decoded', $decoded);
         if (isset($decoded[$responsetype])) {
             $payloadResponse = $decoded[$responsetype];
             if ($responsetype == 'payload') {
