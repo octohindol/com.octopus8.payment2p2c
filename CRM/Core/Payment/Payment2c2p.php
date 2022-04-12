@@ -12,29 +12,49 @@
 use Civi\Payment\Exception\PaymentProcessorException;
 
 /**
- * Class CRM_Core_Payment_PayflowPro.
+ * Class CRM_Core_Payment_Payment2c2p.
  */
 class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 {
-
+    private $data;
     /**
      * @var GuzzleHttp\Client
      */
     protected $guzzleClient;
 
     /**
+     * We only need one instance of this object. So we use the singleton
+     * pattern and cache the instance in this variable
+     *
+     * @var object
+     * @static
+     */
+    static private $_singleton = null;
+
+    /**
+     * mode of operation: live or test
+     *
+     * @var object
+     * @static
+     */
+    static protected $_mode = null;
+
+    /**
      * Constructor
      *
-     * @param string $mode
-     *   The mode of operation: live or test.
-     * @param $paymentProcessor
+     * @param string $mode the mode of operation: live or test
+     *
+     * @return void
      */
-    public function __construct($mode, &$paymentProcessor)
+    function __construct($mode, &$paymentProcessor)
     {
-        // live or test
+
+        $config = CRM_Core_Config::singleton();
         $this->_mode = $mode;
         $this->_paymentProcessor = $paymentProcessor;
+        $this->_processorName = ts('2c2p Payment Processor');
     }
+
 
     /**
      * @return \GuzzleHttp\Client
@@ -58,461 +78,196 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      * credit card transactions
      */
 
+
     /**
-     * This function collects all the information from a web/api form and invokes
-     * the relevant payment processor specific functions to perform the transaction
+     * singleton function used to manage this object
      *
-     * @param array|PropertyBag $params
+     * @param string $mode the mode of operation: live or test
      *
-     * @param string $component
+     * @return object
+     * @static
      *
-     * @return array
-     *   Result array (containing at least the key payment_status_id)
-     *
-     * @throws \Civi\Payment\Exception\PaymentProcessorException
      */
-    public function doPayment(&$params, $component = 'contribute')
+    static function &singleton($mode, &$paymentProcessor)
     {
-        $propertyBag = \Civi\Payment\PropertyBag::cast($params);
-        $this->_component = $component;
-        $statuses = CRM_Contribute_BAO_Contribution::buildOptions('contribution_status_id', 'validate');
+        $processorName = $paymentProcessor['name'];
+        if (self::$_singleton[$processorName] === null) {
+            self::$_singleton[$processorName] = new org_civicrm_payment_zaakpay($mode, $paymentProcessor);
+        }
+        return self::$_singleton[$processorName];
+    }
 
-        // If we have a $0 amount, skip call to processor and set payment_status to Completed.
-        // Conceivably a processor might override this - perhaps for setting up a token - but we don't
-        // have an example of that at the moment.
-        if ($propertyBag->getAmount() == 0) {
-            $result['payment_status_id'] = array_search('Completed', $statuses);
-            $result['payment_status'] = 'Completed';
-            return $result;
+    /**
+     * This function checks to see if we have the right config values
+     *
+     * @return string the error message if any
+     * @public
+     */
+    function checkConfig()
+    {
+        $config = CRM_Core_Config::singleton();
+
+        $error = array();
+
+        if (empty($this->_paymentProcessor['user_name'])) {
+            $error[] = ts('Merchant Identifier must not be empty.');
         }
 
-        if (!defined('CURLOPT_SSLCERT')) {
-            throw new PaymentProcessorException(ts('2c2p requires curl with SSL support'));
+        if (empty($this->_paymentProcessor['password'])) {
+            $error[] = ts('Secret Key must not be empty.');
         }
 
-        /*
-         * define variables for connecting with the gateway
-         */
 
-        // Are you using the Payflow Fraud Protection Service?
-        // Default is YES, change to NO or blank if not.
-        //This has not been investigated as part of writing this payment processor
-        $fraud = 'NO';
-        //if you have not set up a separate user account the vendor name is used as the username
-        if (!$this->_paymentProcessor['subject']) {
-            $user = $this->_paymentProcessor['user_name'];
+        if (!empty($error)) {
+            return implode('<p>', $error);
         } else {
-            $user = $this->_paymentProcessor['subject'];
+            return NULL;
+        }
+    }
+
+    function doDirectPayment(&$params)
+    {
+        CRM_Core_Error::fatal(ts('This function is not implemented'));
+    }
+
+    function doTransferCheckout(&$params, $component = 'component')
+    {
+        $component = strtolower($component);
+        $config = CRM_Core_Config::singleton();
+
+        if ($component != 'contribute' && $component != 'event') {
+            CRM_Core_Error::fatal(ts('Component is invalid'));
         }
 
-        // ideally this id would be passed through into this class as
-        // part of the paymentProcessor
-        //object with the other variables. It seems inefficient to re-query to get it.
-        //$params['processor_id'] = CRM_Core_DAO::getFieldValue(
-        // 'CRM_Contribute_DAO_ContributionP
-        //age',$params['contributionPageID'],  'payment_processor_id' );
+        $email = isset($params['email-5']) ? $params['email-5'] : $params['email-Primary'];
 
-        /*
-         *Create the array of variables to be sent to the processor from the $params array
-         * passed into this function
-         *
+        /* Sanitization of every data is important to calculate checksum. */
+        /* Refer to zaakpay transact api documentation to see which array key means what */
+
+        $this->data = array(
+            'merchantIdentifier' => Checksum::sanitizedParam($this->_paymentProcessor['user_name']),
+            'orderId' => Checksum::sanitizedParam(substr($params['invoiceID'], 0, 15)),
+            'buyerEmail' => Checksum::sanitizedParam($email),
+            'buyerFirstName' => Checksum::sanitizedParam($params['first_name']),
+            'buyerLastName' => Checksum::sanitizedParam($params['last_name']),
+            'buyerAddress' => Checksum::sanitizedParam($params['address_name-Primary']),
+            'buyerCity' => Checksum::sanitizedParam($params['city-Primary']),
+            'buyerState' => Checksum::sanitizedParam($params['state_province-Primary']),
+            'buyerCountry' => Checksum::sanitizedParam($params['country-Primary']),
+            'buyerPincode' => Checksum::sanitizedParam($params['postal_code-Primary']),
+            'buyerPhoneNumber' => Checksum::sanitizedParam($params['phone-Primary-1']),
+            'txnType' => Checksum::sanitizedParam(1),
+            'zpPayOption' => Checksum::sanitizedParam(1),
+            'mode' => Checksum::sanitizedParam($this->_mode == 'test' ? 0 : 1),
+            'currency' => Checksum::sanitizedParam('INR'), // zaakpay only supports INR
+            'amount' => Checksum::sanitizedParam($params['amount'] * 100),
+            'merchantIpAddress' => Checksum::sanitizedParam($this->_paymentProcessor['signature']),
+            'purpose' => Checksum::sanitizedParam(1),
+            'productDescription' => Checksum::sanitizedParam($params['description']),
+            'txnDate' => Checksum::sanitizedParam(date('Y-n-d')),
+        );
+
+
+        /* set return url based on the component */
+
+        if ($component == 'contribute') {
+            $this->data['returnUrl'] = CRM_Utils_System::baseCMSURL() . "civicrm/payment/ipn?processor_name=Zaakpay&md=contribute&qfKey=" . $params['qfKey'] . '&inId=' . $params['invoiceID'];
+        } else if ($component == 'event') {
+            $this->data['returnUrl'] = CRM_Utils_System::baseCMSURL() . "civicrm/payment/ipn?processor_name=Zaakpay&md=event&qfKey=" . $params['qfKey'] . '&pid=' . $params['participantID'] . "&eid=" . $params['eventID'] . "&inId=" . $params['invoiceID'];
+        }
+
+        /* important because without storing session objects,
+         *  civicrm wouldnt know if the confirm page ever submitted as we are using exit at the end
+         *  and it will never redirect to the thank you page, rather keeps redirecting to the confirmation page.
          */
 
-        $payflow_query_array = [
-            'USER' => $user,
-            'VENDOR' => $this->_paymentProcessor['user_name'],
-            'PARTNER' => $this->_paymentProcessor['signature'],
-            'PWD' => $this->_paymentProcessor['password'],
-            // C - Direct Payment using credit card
-            'TENDER' => 'C',
-            // A - Authorization, S - Sale
-            'TRXTYPE' => 'S',
-            'ACCT' => urlencode($params['credit_card_number']),
-            'CVV2' => $params['cvv2'],
-            'EXPDATE' => urlencode(sprintf('%02d', (int)$params['month']) . substr($params['year'], 2, 2)),
-            'ACCTTYPE' => urlencode($params['credit_card_type']),
-            'AMT' => urlencode($this->getAmount($params)),
-            'CURRENCY' => urlencode($params['currency']),
-            'FIRSTNAME' => $params['billing_first_name'],
-            //credit card name
-            'LASTNAME' => $params['billing_last_name'],
-            //credit card name
-            'STREET' => $params['street_address'],
-            'CITY' => urlencode($params['city']),
-            'STATE' => urlencode($params['state_province']),
-            'ZIP' => urlencode($params['postal_code']),
-            'COUNTRY' => urlencode($params['country']),
-            'EMAIL' => $params['email'],
-            'CUSTIP' => urlencode($params['ip_address']),
-            'COMMENT1' => urlencode($params['contributionType_accounting_code']),
-            'COMMENT2' => $this->_mode,
-            'INVNUM' => urlencode($params['invoiceID']),
-            'ORDERDESC' => urlencode($params['description']),
-            'VERBOSITY' => 'MEDIUM',
-            'BILLTOCOUNTRY' => urlencode($params['country']),
-        ];
+        require_once 'CRM/Core/Session.php';
+        CRM_Core_Session::storeSessionObjects();
 
-        if ($params['installments'] == 1) {
-            $params['is_recur'] = FALSE;
-        }
+        $secret = $this->_paymentProcessor['password'];
 
-        if ($params['is_recur'] == TRUE) {
+        /* calculate checksum by using the functions given in checksum.php which is provide by Zaakpay */
 
-            $payflow_query_array['TRXTYPE'] = 'R';
-            $payflow_query_array['OPTIONALTRX'] = 'S';
-            $payflow_query_array['OPTIONALTRXAMT'] = $this->getAmount($params);
-            //Amount of the initial Transaction. Required
-            $payflow_query_array['ACTION'] = 'A';
-            //A for add recurring (M-modify,C-cancel,R-reactivate,I-inquiry,P-payment
-            $payflow_query_array['PROFILENAME'] = urlencode('RegularContribution');
-            //A for add recurring (M-modify,C-cancel,R-reactivate,I-inquiry,P-payment
-            if ($params['installments'] > 0) {
-                $payflow_query_array['TERM'] = $params['installments'] - 1;
-                //ie. in addition to the one happening with this transaction
-            }
-            // $payflow_query_array['COMPANYNAME']
-            // $payflow_query_array['DESC']  =  not set yet  Optional
-            // description of the goods or
-            //services being purchased.
-            //This parameter applies only for ACH_CCD accounts.
-            // The
-            // $payflow_query_array['MAXFAILPAYMENTS']   = 0;
-            // number of payment periods (as s
-            //pecified by PAYPERIOD) for which the transaction is allowed
-            //to fail before PayPal cancels a profile.  the default
-            // value of 0 (zero) specifies no
-            //limit. Retry
-            //attempts occur until the term is complete.
-            // $payflow_query_array['RETRYNUMDAYS'] = (not set as can't assume business rule
+        $all = Checksum::getAllParams($this->data);
 
-            $interval = $params['frequency_interval'] . " " . $params['frequency_unit'];
-            switch ($interval) {
-                case '1 week':
-                    $params['next_sched_contribution_date'] = mktime(0, 0, 0, date("m"), date("d") + 7,
-                        date("Y")
+        $checksum = Checksum::calculateChecksum($secret, $all);
+        $this->data['checksum'] = $checksum;
+
+
+        /* includes zaakpay.tpl which posts the data to zaakpay */
+
+        $template = CRM_Core_Smarty::singleton();
+        $tpl = $this->templateDir . 'zaakpay.tpl';
+
+        $template->assign('data', $this->data);
+        $tpl = $template->fetch($tpl);
+        print $tpl;
+        exit;
+    }
+
+    /*
+     * 	This is the function which handles the response
+     * when zaakpay redirects the user back to our website
+     * after transaction.
+     * Refer to the $this->data['returnURL'] in above function to see how the Url should be created
+     */
+
+    public function handlePaymentNotification()
+    {
+        CRM_Core_Error::debug_var('request', $_REQUEST);
+        CRM_Core_Error::debug_var('post', $_POST);
+        $paymentResponse = $_POST['$paymentResponse'];
+
+        require_once 'CRM/Utils/Array.php';
+
+        $module = CRM_Utils_Array::value('md', $_GET);
+        $qfKey = CRM_Utils_Array::value('qfKey', $_GET);
+        $invoiceId = CRM_Utils_Array::value('inId', $_GET);
+
+        switch ($module) {
+            case 'contribute':
+                if ($paymentResponse['responseCode'] == 100) {
+                    $query = "UPDATE civicrm_contribution SET trxn_id='" . $_POST['orderId'] . "', contribution_status_id=1 where invoice_id='" . $invoiceId . "'";
+                    CRM_Core_DAO::executeQuery($query);
+                    $url = CRM_Utils_System::url('civicrm/contribute/transact', "_qf_ThankYou_display=1&qfKey={$qfKey}", FALSE, NULL, FALSE
                     );
-                    $params['end_date'] = mktime(0, 0, 0, date("m"), date("d") + (7 * $payflow_query_array['TERM']),
-                        date("Y")
+                } else {
+                    CRM_Core_Session::setStatus(ts($_POST['responseDescription']), ts('Zaakpay Error:'), 'error');
+                    $url = CRM_Utils_System::url('civicrm/contribute/transact', "_qf_Confirm_display=true&qfKey={$qfKey}", FALSE, NULL, FALSE
                     );
-                    $payflow_query_array['START'] = date('mdY', $params['next_sched_contribution_date']);
-                    $payflow_query_array['PAYPERIOD'] = "WEEK";
-                    $params['frequency_unit'] = "week";
-                    $params['frequency_interval'] = 1;
-                    break;
-
-                case '2 weeks':
-                    $params['next_sched_contribution_date'] = mktime(0, 0, 0, date("m"), date("d") + 14, date("Y"));
-                    $params['end_date'] = mktime(0, 0, 0, date("m"), date("d") + (14 * $payflow_query_array['TERM']), date("Y ")
-                    );
-                    $payflow_query_array['START'] = date('mdY', $params['next_sched_contribution_date']);
-                    $payflow_query_array['PAYPERIOD'] = "BIWK";
-                    $params['frequency_unit'] = "week";
-                    $params['frequency_interval'] = 2;
-                    break;
-
-                case '4 weeks':
-                    $params['next_sched_contribution_date'] = mktime(0, 0, 0, date("m"), date("d") + 28, date("Y")
-                    );
-                    $params['end_date'] = mktime(0, 0, 0, date("m"), date("d") + (28 * $payflow_query_array['TERM']), date("Y")
-                    );
-                    $payflow_query_array['START'] = date('mdY', $params['next_sched_contribution_date']);
-                    $payflow_query_array['PAYPERIOD'] = "FRWK";
-                    $params['frequency_unit'] = "week";
-                    $params['frequency_interval'] = 4;
-                    break;
-
-                case '1 month':
-                    $params['next_sched_contribution_date'] = mktime(0, 0, 0, date("m") + 1,
-                        date("d"), date("Y")
-                    );
-                    $params['end_date'] = mktime(0, 0, 0, date("m") +
-                        (1 * $payflow_query_array['TERM']),
-                        date("d"), date("Y")
-                    );
-                    $payflow_query_array['START'] = date('mdY', $params['next_sched_contribution_date']);
-                    $payflow_query_array['PAYPERIOD'] = "MONT";
-                    $params['frequency_unit'] = "month";
-                    $params['frequency_interval'] = 1;
-                    break;
-
-                case '3 months':
-                    $params['next_sched_contribution_date'] = mktime(0, 0, 0, date("m") + 3, date("d"), date("Y")
-                    );
-                    $params['end_date'] = mktime(0, 0, 0, date("m") +
-                        (3 * $payflow_query_array['TERM']),
-                        date("d"), date("Y")
-                    );
-                    $payflow_query_array['START'] = date('mdY', $params['next_sched_contribution_date']);
-                    $payflow_query_array['PAYPERIOD'] = "QTER";
-                    $params['frequency_unit'] = "month";
-                    $params['frequency_interval'] = 3;
-                    break;
-
-                case '6 months':
-                    $params['next_sched_contribution_date'] = mktime(0, 0, 0, date("m") + 6, date("d"),
-                        date("Y")
-                    );
-                    $params['end_date'] = mktime(0, 0, 0, date("m") +
-                        (6 * $payflow_query_array['TERM']),
-                        date("d"), date("Y")
-                    );
-                    $payflow_query_array['START'] = date('mdY', $params['next_sched_contribution_date']
-                    );
-                    $payflow_query_array['PAYPERIOD'] = "SMYR";
-                    $params['frequency_unit'] = "month";
-                    $params['frequency_interval'] = 6;
-                    break;
-
-                case '1 year':
-                    $params['next_sched_contribution_date'] = mktime(0, 0, 0, date("m"), date("d"),
-                        date("Y") + 1
-                    );
-                    $params['end_date'] = mktime(0, 0, 0, date("m"), date("d"),
-                        date("Y") +
-                        (1 * $payflow_query_array['TEM'])
-                    );
-                    $payflow_query_array['START'] = date('mdY', $params['next_sched_contribution_date']);
-                    $payflow_query_array['PAYPERIOD'] = "YEAR";
-                    $params['frequency_unit'] = "year";
-                    $params['frequency_interval'] = 1;
-                    break;
-            }
-        }
-
-        CRM_Utils_Hook::alterPaymentProcessorParams($this, $params, $payflow_query_array);
-        $payflow_query = $this->convert_to_nvp($payflow_query_array);
-        CRM_Core_Error::debug_var('payflow_query', $payflow_query);
-        /*
-         * Check to see if we have a duplicate before we send
-         */
-        if ($this->checkDupe($params['invoiceID'], CRM_Utils_Array::value('contributionID', $params))) {
-            throw new PaymentProcessorException('It appears that this transaction is a duplicate.  Have you already submitted the form once?  If so there may have been a connection problem.  Check your email for a receipt.  If you do not receive a receipt within 2 hours you can try your transaction again.  If you continue to have problems please contact the site administrator.', 9003);
-        }
-
-        // ie. url at payment processor to submit to.
-        $submiturl = $this->_paymentProcessor['url_site'];
-
-        $responseData = self::submit_transaction($submiturl, $payflow_query);
-
-        /*
-         * Payment successfully sent to gateway - process the response now
-         */
-        $result = strstr($responseData, 'RESULT');
-        CRM_Core_Error::debug_var('result', $result);
-
-        if (empty($result)) {
-            throw new PaymentProcessorException('No RESULT code from PayPal.', 9016);
-        }
-
-        $nvpArray = [];
-        while (strlen($result)) {
-            // name
-            $keypos = strpos($result, '=');
-            $keyval = substr($result, 0, $keypos);
-            // value
-            $valuepos = strpos($result, '&') ? strpos($result, '&') : strlen($result);
-            $valval = substr($result, $keypos + 1, $valuepos - $keypos - 1);
-            // decoding the respose
-            $nvpArray[$keyval] = $valval;
-            $result = substr($result, $valuepos + 1, strlen($result));
-        }
-        // get the result code to validate.
-        $result_code = $nvpArray['RESULT'];
-        /*debug
-        echo "<p>Params array</p><br>";
-        print_r($params);
-        echo "<p></p><br>";
-        echo "<p>Values to Payment Processor</p><br>";
-        print_r($payflow_query_array);
-        echo "<p></p><br>";
-        echo "<p>Results from Payment Processor</p><br>";
-        print_r($nvpArray);
-        echo "<p></p><br>";
-         */
-
-        switch ($result_code) {
-            case 0:
-
-                /*******************************************************
-                 * Success !
-                 * This is a successful transaction. Payflow Pro does return further information
-                 * about transactions to help you identify fraud including whether they pass
-                 * the cvv check, the avs check. This is stored in
-                 * CiviCRM as part of the transact
-                 * but not further processing is done. Business rules would need to be defined
-                 *******************************************************/
-                $params['trxn_id'] = ($nvpArray['PNREF'] ?? '') . ($nvpArray['TRXPNREF'] ?? '');
-                //'trxn_id' is varchar(255) field. returned value is length 12
-                $params['trxn_result_code'] = $nvpArray['AUTHCODE'] . "-Cvv2:" . $nvpArray['CVV2MATCH'] . "-avs:" . $nvpArray['AVSADDR'];
-
-                if ($params['is_recur'] == TRUE) {
-                    $params['recur_trxn_id'] = $nvpArray['PROFILEID'];
-                    //'trxn_id' is varchar(255) field. returned value is length 12
                 }
-                $params['payment_status_id'] = array_search('Completed', $statuses);
-                $params['payment_status'] = 'Completed';
-                return $params;
 
-            case 1:
-                throw new PaymentProcessorException('There is a payment processor configuration problem. This is usually due to invalid account information or ip restrictions on the account.  You can verify ip restriction by logging         // into Manager.  See Service Settings >> Allowed IP Addresses.   ', 9003);
+                break;
 
-            case 12:
-                // Hard decline from bank.
-                throw new PaymentProcessorException('Your transaction was declined   ', 9009);
+            case 'event':
 
-            case 13:
-                // Voice authorization required.
-                throw new PaymentProcessorException('Your Transaction is pending. Contact Customer Service to complete your order.', 9010);
+                if ($paymentResponse['responseCode'] == 100) { // success code
+                    $participantId = CRM_Utils_Array::value('pid', $_GET);
+                    $eventId = CRM_Utils_Array::value('eid', $_GET);
 
-            case 23:
-                // Issue with credit card number or expiration date.
-                throw new PaymentProcessorException('Invalid credit card information. Please re-enter.', 9011);
+                    $query = "UPDATE civicrm_participant SET status_id = 1 where id =" . $participantId . " AND event_id=" . $eventId;
+                    CRM_Core_DAO::executeQuery($query);
 
-            case 26:
-                throw new PaymentProcessorException('You have not configured your payment processor with the correct credentials. Make sure you have provided both the <vendor> and the <user> variables ', 9012);
+                    $query = "UPDATE civicrm_contribution SET trxn_id='" . $_POST['orderId'] . "', contribution_status_id=1 where invoice_id='" . $invoiceId . "'";
+
+                    CRM_Core_DAO::executeQuery($query);
+
+                    $url = CRM_Utils_System::url('civicrm/event/register', "_qf_ThankYou_display=1&qfKey={$qfKey}", FALSE, NULL, FALSE
+                    );
+                } else { // error code
+                    CRM_Core_Session::setStatus(ts($_POST['responseDescription']), ts('Zaakpay Error:'), 'error');
+                    $url = CRM_Utils_System::url('civicrm/event/register', "_qf_Confirm_display=true&qfKey={$qfKey}", FALSE, NULL, FALSE
+                    );
+                }
+
+                break;
 
             default:
-                throw new PaymentProcessorException('Error - from payment processor: [' . $result_code . " " . $nvpArray['RESPMSG'] . "] ", 9013);
+                require_once 'CRM/Core/Error.php';
+                CRM_Core_Error::debug_log_message("Could not get module name from request url");
+                echo "Could not get module name from request url\r\n";
         }
-    }
-
-    /**
-     * This public function checks to see if we have the right processor config values set
-     *
-     * NOTE: Called by Events and Contribute to check config params are set prior to trying
-     *  register any credit card details
-     *
-     * @return string|null
-     *   the error message if any, null if OK
-     */
-    public function checkConfig()
-    {
-        $errorMsg = [];
-        if (empty($this->_paymentProcessor['user_name'])) {
-            $errorMsg[] = ' ' . ts('ssl_merchant_id is not set for this payment processor');
-        }
-
-        if (empty($this->_paymentProcessor['url_site'])) {
-            $errorMsg[] = ' ' . ts('URL is not set for %1', [1 => $this->_paymentProcessor['name']]);
-        }
-
-        if (!empty($errorMsg)) {
-            return implode('<p>', $errorMsg);
-        }
-        return NULL;
-    }
-
-    /**
-     * convert to a name/value pair (nvp) string
-     *
-     * @param $payflow_query_array
-     *
-     * @return array|string
-     */
-    public function convert_to_nvp($payflow_query_array)
-    {
-        foreach ($payflow_query_array as $key => $value) {
-            $payflow_query[] = $key . '[' . strlen($value) . ']=' . $value;
-        }
-        $payflow_query = implode('&', $payflow_query);
-
-        return $payflow_query;
-    }
-
-    /**
-     * Submit transaction using cURL
-     *
-     * @param string $submiturl Url to direct HTTPS GET to
-     * @param string $payment_query value string to be posted
-     *
-     * @return mixed|object
-     * @throws \Civi\Payment\Exception\PaymentProcessorException
-     */
-    public function submit_transaction($submiturl, $payment_query)
-    {
-        // get data ready for API
-        $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Guzzle';
-        // Here's your custom headers; adjust appropriately for your setup:
-        $headers[] = "Content-Type: text/namevalue";
-        //or text/xml if using XMLPay.
-        $headers[] = "Content-Length : " . strlen($payment_query);
-        // Length of data to be passed
-        // Here the server timeout value is set to 45, but notice
-        // below in the cURL section, the timeout
-        // for cURL is 90 seconds.  You want to make sure the server
-        // timeout is less, then the connection.
-        $headers[] = "X-VPS-Timeout: 45";
-        // random unique number  - the transaction is retried using this transaction ID
-        // in this function but if that doesn't work and it is re- submitted
-        // it is treated as a new attempt. Payflow Pro doesn't allow
-        // you to change details (e.g. card no) when you re-submit
-        // you can only try the same details
-        $headers[] = "X-VPS-Request-ID: " . rand(1, 1000000000);
-        // optional header field
-        $headers[] = "X-VPS-VIT-Integration-Product: CiviCRM";
-        // other Optional Headers.  If used adjust as necessary.
-        // Name of your OS
-        //$headers[] = "X-VPS-VIT-OS-Name: Linux";
-        // OS Version
-        //$headers[] = "X-VPS-VIT-OS-Version: RHEL 4";
-        // What you are using
-        //$headers[] = "X-VPS-VIT-Client-Type: PHP/cURL";
-        // For your info
-        //$headers[] = "X-VPS-VIT-Client-Version: 0.01";
-        // For your info
-        //$headers[] = "X-VPS-VIT-Client-Architecture: x86";
-        // Application version
-        //$headers[] = "X-VPS-VIT-Integration-Version: 0.01";
-        $response = $this->getGuzzleClient()->post($submiturl, [
-            'body' => $payment_query,
-            'headers' => $headers,
-            'curl' => [
-                CURLOPT_SSL_VERIFYPEER => Civi::settings()->get('verifySSL'),
-                CURLOPT_USERAGENT => $user_agent,
-                CURLOPT_RETURNTRANSFER => TRUE,
-                CURLOPT_TIMEOUT => 90,
-                CURLOPT_SSL_VERIFYHOST => Civi::settings()->get('verifySSL') ? 2 : 0,
-                CURLOPT_POST => TRUE,
-            ],
-        ]);
-
-        // Try to submit the transaction up to 3 times with 5 second delay.  This can be used
-        // in case of network issues.  The idea here is since you are posting via HTTPS there
-        // could be general network issues, so try a few times before you tell customer there
-        // is an issue.
-
-        $i = 1;
-        while ($i++ <= 3) {
-            $responseData = $response->getBody();
-            $http_code = $response->getStatusCode();
-            if ($http_code != 200) {
-                // Let's wait 5 seconds to see if its a temporary network issue.
-                sleep(5);
-            } elseif ($http_code == 200) {
-                // we got a good response, drop out of loop.
-                break;
-            }
-        }
-        if ($http_code != 200) {
-            throw new PaymentProcessorException('Error connecting to the 2c2p Pro API server.', 9015);
-        }
-
-        if (($responseData === FALSE) || (strlen($responseData) == 0)) {
-            throw new PaymentProcessorException("Error: Connection to payment gateway failed - no data
-                                           returned. Gateway url set to $submiturl", 9006);
-        }
-
-        /*
-         * If gateway returned no data - tell 'em and bail out
-         */
-        if (empty($responseData)) {
-            throw new PaymentProcessorException('Error: No data returned from payment gateway.', 9007);
-        }
-
-        /*
-         * Success so far - close the curl and check the data
-         */
-        return $responseData;
+        CRM_Utils_System::redirect($url);
     }
 
 
@@ -531,7 +286,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         return CRM_Payment2c2p_Helper::base64url_decode($data);
     }
 
-    public function getPaymentPayload($secretkey, $merchant_id, $invoice_no, $description, $amount, $currency)
+    public function getPaymentPayload($secretkey, $merchant_id, $invoice_no, $description, $amount, $currency, $frontendReturnUrl)
     {
         $paymentTokenRequest = new CRM_Payment2c2p_PaymentTokenRequest;
         $paymentTokenRequest->secretkey = $secretkey;
@@ -540,23 +295,49 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $paymentTokenRequest->description = $description;
         $paymentTokenRequest->amount = $amount;
         $paymentTokenRequest->currency = $currency;
+        $paymentTokenRequest->frontendReturnUrl = $frontendReturnUrl;
         return $paymentTokenRequest->getJwtData();
     }
 
     /**
-     * @param $secretkey
+     * @param $secretKey
      * @param $response
      * @return array
      */
-    public function getDecodedTokenResponse($secretkey, $response){
+    public function getDecodedTokenResponse($response, $secretKey, $responseType = "payload")
+    {
 
-        return CRM_Payment2c2p_PaymentTokenRequest::getDecodedTokenResponse($secretkey, $response);
+        return CRM_Payment2c2p_PaymentTokenRequest::getDecodedTokenResponse($response, $secretKey, $responseType);
     }
 
-    public function getEncodedTokenResponse($url, $payload){
+    public function getEncodedTokenResponse($url, $payload)
+    {
 
         return CRM_Payment2c2p_PaymentTokenRequest::getEncodedTokenResponse($url, $payload);
     }
 
+    public function getReturnUrl($processor_name, $params, $component = 'contribute')
+    {
+        if ($component == 'contribute') {
+            $this->data['returnUrl'] = CRM_Utils_System::baseCMSURL() .
+                "civicrm/payment/ipn?processor_name=$processor_name&md=contribute&qfKey=" .
+                $params['qfKey'] .
+                '&inId=' . $params['invoiceID'];
+            return $this->data['returnUrl'];
+        } else if ($component == 'event') {
+            $this->data['returnUrl'] = CRM_Utils_System::baseCMSURL() .
+                "civicrm/payment/ipn?processor_name=$processor_name&md=event&qfKey=" .
+                $params['qfKey'] .
+                '&pid=' . $params['participantID'] .
+                "&eid=" . $params['eventID'] .
+                "&inId=" . $params['invoiceID'];
+            return $this->data['returnUrl'];
+        }
+        return $this->data['returnUrl'];
+    }
+
+
+
 
 }
+

@@ -34,6 +34,26 @@ class CRM_Payment2c2p_PaymentTokenRequest
     public $default_lang = '';
     public $statement_descriptor = '';
     public $hash_value = '';
+    public $frontendReturnUrl = '';
+
+    /**
+     * @param $secretkey
+     * @param $payloadResponse
+     * @return array
+     */
+    public static function getDecodedPayloadJWT($payloadResponse, $secretkey): array
+    {
+        $decodedPayload = JWT::decode($payloadResponse, $secretkey, array('HS256'));
+        $decoded_array = (array)$decodedPayload;
+        return $decoded_array;
+    }
+    public static function getDecodedPayload64($payloadResponse, $secretkey = ""): array
+    {
+        $decodedPayloadString = base64_decode($payloadResponse);
+        $decodedPayload = json_decode($decodedPayloadString);
+        $decoded_array = (array)$decodedPayload;
+        return $decoded_array;
+    }
 
     /**
      * @return string
@@ -46,6 +66,7 @@ class CRM_Payment2c2p_PaymentTokenRequest
             "description" => $this->description,
             "amount" => $this->amount,
             "currencyCode" => $this->currency,
+            "frontendReturnUrl" => $this->frontendReturnUrl,
         );
 
         $jwt = JWT::encode($payload, $this->secretkey);
@@ -59,13 +80,17 @@ class CRM_Payment2c2p_PaymentTokenRequest
      * @param $secretkey
      * @param $response
      */
-    public static function getDecodedTokenResponse($secretkey, $response): array
+    public static function getDecodedTokenResponse($response, $secretkey, $responsetype = 'payload'): array
     {
         $decoded = json_decode($response, true);
-        if (isset($decoded['payload'])) {
-            $payloadResponse = $decoded['payload'];
-            $decodedPayload = JWT::decode($payloadResponse, $secretkey, array('HS256'));
-            $decoded_array = (array)$decodedPayload;
+        if (isset($decoded[$responsetype])) {
+            $payloadResponse = $decoded[$responsetype];
+            if ($responsetype == 'payload') {
+                $decoded_array = self::getDecodedPayloadJWT($payloadResponse, $secretkey);
+            }
+            if ($responsetype == 'paymentResponse') {
+                $decoded_array = self::getDecodedPayload64($payloadResponse);
+            }
             return $decoded_array;
         } else {
             return $decoded;

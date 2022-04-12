@@ -71,17 +71,17 @@ class CRM_Core_Payment_Payment2c2pTest extends \PHPUnit\Framework\TestCase imple
         return $payload;
     }
 
-    public function _testPaymentTokenResponse()
+    public function testDecodedTokenResponse()
     {
-        $response = '{"payload":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJtZXJjaGFudElEIjoiSlQwMSIsImludm9pY2VObyI6IjE1MjM5NTM2NjEiLCJkZXNjcmlwdGlvbiI6Iml0ZW0gMSIsImFtb3VudCI6MTAwMCwiY3VycmVuY3lDb2RlIjoiU0dEIn0.uf01i3faxJhHR7kN6DP9oHcGd3rERvPDC6K9NzINBMU"}';
+        $response = '{"paymentResponse":"eyJsb2NhbGUiOm51bGwsImludm9pY2VObyI6IjE2NDk3MjUzMzQiLCJjaGFubmVsQ29kZSI6IkNDIiwicmVzcENvZGUiOiIyMDAwIiwicmVzcERlc2MiOiJUcmFuc2FjdGlvbiBpcyBjb21wbGV0ZWQsIHBsZWFzZSBkbyBwYXltZW50IGlucXVpcnkgcmVxdWVzdCBmb3IgZnVsbCBwYXltZW50IGluZm9ybWF0aW9uLiJ9"}';
         $secretKey = 'ECC4E54DBA738857B84A7EBC6B5DC7187B8DA68750E88AB53AAA41F548D6F2D9';	//Get SecretKey from 2C2P PGW Dashboard
-        $payload = $this->processor->getPaymentTokenResponse($secretKey, $response);
+        $payload = $this->processor->getDecodedTokenResponse($response, $secretKey, 'paymentResponse');
         print_r($payload);
         $this->assertSame('0000', $payload['respCode']);
         return $payload;
     }
 
-    public function testPaymentTokenRequestResponse()
+    public function _testPaymentTokenRequestResponse()
     {
         $merchantId = 'JT01';		//Get MerchantID when opening account with 2C2P
         $secretKey = 'ECC4E54DBA738857B84A7EBC6B5DC7187B8DA68750E88AB53AAA41F548D6F2D9';	//Get SecretKey from 2C2P PGW Dashboard
@@ -89,8 +89,17 @@ class CRM_Core_Payment_Payment2c2pTest extends \PHPUnit\Framework\TestCase imple
         $description = 'item 1';
         $amount = 1000.00;
         $currencyCode = 'SGD';
+        $processor_name = 'Payment2c2p';
+        $params = [];
+        $params['qfKey'] = '123';
+        $params['participantID'] = '323';
+        $params['eventID'] = '232';
+        $params['invoiceID'] = $invoiceNo;
+        $returnUrl = $this->processor->getReturnUrl($processor_name, $params, $component = 'contribute');
+
+        $frontendReturnUrl = $returnUrl;
         $url = 'https://sandbox-pgw.2c2p.com/payment/4.1/PaymentToken';
-        $payload = $this->processor->getPaymentPayload($secretKey, $merchantId, $invoiceNo, $description, $amount, $currencyCode);
+        $payload = $this->processor->getPaymentPayload($secretKey, $merchantId, $invoiceNo, $description, $amount, $currencyCode, $frontendReturnUrl);
 //        print_r($payload);
         $encodedTokenResponse = $this->processor->getEncodedTokenResponse($url, $payload);
 //        print_r($encodedTokenResponse);
@@ -100,6 +109,18 @@ class CRM_Core_Payment_Payment2c2pTest extends \PHPUnit\Framework\TestCase imple
         return $decodedTokenResponse;
     }
 
+    public function _testGetReturnUrl(){
+        $processor_name = 'demoPayment2c2p';
+        $params = [];
+        $params['qfKey'] = '123';
+        $params['participantID'] = '323';
+        $params['eventID'] = '232';
+        $params['invoiceID'] = '131';
+        $returnUrl = $this->processor->getReturnUrl($processor_name, $params, $component = 'contribute');
+        print "\n";
+        print $returnUrl;
+        $this->assertSame('http://localhost:3306/civicrm/payment/ipn?processor_name=demoPayment2c2p&md=contribute&qfKey=123&inId=131', $returnUrl);
+    }
     /**
    * Test making a call to 2c2p
    */
@@ -271,8 +292,13 @@ class CRM_Core_Payment_Payment2c2pTest extends \PHPUnit\Framework\TestCase imple
         'return' => 'id',
       ], 'integer');
     }
-    $result = $this->callAPISuccess('payment_processor', 'create', $params);
-    $processorID = $result['id'];
+    $paymentProcessor =  $this->callAPISuccess('payment_processor', 'get', ['name' => 'demoPayment2c2p']);
+    if(isset( $paymentProcessor['id'])){
+        $paymentProcessor = $this->callAPISuccess('payment_processor', 'create', ['id' => $paymentProcessor['id'], 'is_active' => 1]);
+    }else{
+        $paymentProcessor = $this->callAPISuccess('payment_processor', 'create', $params);
+    }
+    $processorID = $paymentProcessor['id'];
     $this->setupMockHandler($processorID);
     $this->ids['PaymentProcessor']['Payment2c2p'] = $processorID;
   }

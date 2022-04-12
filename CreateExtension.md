@@ -4,18 +4,19 @@ Example of Creating A Payment Processor Extension
 ## Contents
 - [Overview](#overview)
 - [Creating the Extension](#creating-the-extension)
-    - [Create the extension by cv](#create-the-extension-by-cv)
-    - [Edit info.xml file](#edit-info.xml-file)
+    - [Create the extension by civix](#create-the-extension-by-civix)
+            - [Billing modes](#billing-modes)
+    - [Create the default payment processor file](#create-the-default-payment-processor-file)
 - [Billing modes](#billing-modes)
     - [Requests](#requests)
         - [URIs/Paths](#urispaths)
-            - [Use Plural Resource Names](#use-plural-resource-names)
             - [Use Nouns, Not Verbs in the Base URI](#use-nouns-not-verbs-in-the-base-uri)
             - [Shorten Associations in the URI - Hide Dependencies in the Parameter List](#shorten-associations-in-the-uri---hide-dependencies-in-the-parameter-list)
         - [Uniform Interface with HTTP Verbs/Methods](#uniform-interface-with-http-verbsmethods)
 
 
 #Overview
+
 This tutorial will help you create a new payment processor extension.  it will use an example of one created at the University of California, Merced.  It is a basic payment processor which works like this:
 
 - Civicrm collects basic information (name, email address, invoice, etc.) and passes this onto the payment processor and asks for token from the payment processors api.
@@ -26,170 +27,95 @@ This tutorial will help you create a new payment processor extension.  it will u
 
 # Creating the Extension
 
-###1. Create the extension directory.
-The extension directory needs to be created in a specific way. It is in the form of ﻿extensionid.type.extensionName.  So in the extension we are creating it uses edu.ucmerced.payment.ucmpaymentcollection
+##Create the extension by civix
+The extension is created by civix like this:
+```
+cd sites/default/files/civicrm/ext
+civix generate:module myentity
+cd myentity
+```
 
-2. Create the info.xml file.
-In your new extension directory create an info.xml file. The layout of the file will look like this:
+### Billing Modes
+- _form_ - a form is where the credit card information is collected on a form on your site and submitted to the payment processor
+- _button_ - a buttons rely on important information (success, variables etc) being communicated directly between your server and the payment processor. (e.g. in the paypal express method. the customer is transferred to the server to enter their details but the transaction is not pushed through until an html request is sent from your server to the processor and the server replies with the response. The server also uses html to query certain variables from the server. From what I remember CURL is used for this.) The user's session remains intact but I'm not sure if session variables or variables sent from the payment processor are used to identify the transaction and customize what the user sees
+- _notify_ - the notify method deals with a situation where there is not a direct two way communication between your server and the processor and there is a need for your server to identify which transaction is being responded to. This was the method I worked with (and seemingly most people who were looking at it at the same time). The payment processor I worked on sends two confirmations - one html GET via the user's browser and a later html GET from the payment processor server. If the user's browser never returns the processor needs to be able to figure out which transaction is involved & to complete it. If the GET is from the user's browser it needs to do the same thing but also redirect the user appropriately.
 
-info.xml
-<?xml version="1.0" encoding="UTF-8" ?>
- <extension key="[Your Directory Name]" type="payment">
-  <file>[Name of the payment processor file]</file>
-  <name>[Name of your application with Underscores]</name>
-  <description>[Description of your application]</description>
-  <urls>
-    <url desc="Main Extension Page">[extension url]</url>
-    <url desc="Documentation">[documentation url]</url>
-    <url desc="Support">[support url]</url>
-    <url desc="Licensing">[license url]</url>
-  </urls>
-  <license>[extension license]</license>
-  <maintainer>
-    <author>[Author Name]</author>
-    <email>[Author Email Address]</email>
-  </maintainer>
-  <releaseDate>[Release Date]</releaseDate>
-  <version>[Extension Version Number]</version>
-  <develStage>[Extension status ex. stable, development, etc.]</develStage>
-  <compatibility><ver>[compatible with which versions of civicrm]</ver></compatibility>
-  <comments>[Any additional comments]</comments>
-  <typeInfo>
-   <userNameLabel>[Label to use for the username field]</userNameLabel>
-   <passwordLabel>[Label to use for the password field]</passwordLabel>
-   <signatureLabel>[Label to use for the signature field]</signatureLabel>
-   <subjectLabel>[Label to use for the subject field]</subjectLabel>
-   <urlSiteDefault>[The url to use to process live site transactions]</urlSiteDefault>
-   <urlApiDefault>[NEEDS A DESCRIPTION]</urlApiDefault>
-   <urlRecurDefault>[NEEDS A DESCRIPTION]</urlRecurDefault>
-   <urlSiteTestDefault>[The url to use to process test site transactions]</urlSiteTestDefault>
-   <urlApiTestDefault>[NEEDS A DESCRIPTION]</urlApiTestDefault>
-   <urlRecurTestDefault>[NEEDS A DESCRIPTION]</urlRecurTestDefault>
-   <urlButtonDefault>[NEEDS A DESCRIPTION]</urlButtonDefault>
-   <urlButtonTestDefault>[NEEDS A DESCRIPTION]</urlButtonTestDefault>
-   <billingMode>[See below for description of billing modes]</billingMode>
-   <isRecur>[NEEDS A DESCRIPTION]</isRecur>
-   <paymentType>[NEEDS A DESCRIPTION]</paymentType>
-  </typeInfo>
-</extension>
-Billing Modes
-form - a form is where the credit card information is collected on a form on your site and submitted to the payment processor
-button - As I understand it buttons rely on important information (success, variables etc) being communicated directly between your server and the payment processor. (e.g. in the paypal express method. the customer is transferred to the server to enter their details but the transaction is not pushed through until an html request is sent from your server to the processor and the server replies with the response. The server also uses html to query certain variables from the server. From what I remember CURL is used for this.) The user's session remains intact but I'm not sure if session variables or variables sent from the payment processor are used to identify the transaction and customize what the user sees
-notify - the notify method deals with a situation where there is not a direct two way communication between your server and the processor and there is a need for your server to identify which transaction is being responded to. This was the method I worked with (and seemingly most people who were looking at it at the same time). The payment processor I worked on sends two confirmations - one html GET via the user's browser and a later html GET from the payment processor server. If the user's browser never returns the processor needs to be able to figure out which transaction is involved & to complete it. If the GET is from the user's browser it needs to do the same thing but also redirect the user appropriately.
-So for the extension we are building it looks like
-
-info.xml
-<?xml version="1.0" encoding="UTF-8" ?>
- <extension key="edu.ucmerced.payment.ucmpaymentcollection" type="payment">
-  <file>UCMPaymentCollection</file>
-  <name>UCMPaymentCollection</name>
-  <description>UC Merced Payment Processor</description>
-  <urls>
-    <url desc="Main Extension Page"></url>
-    <url desc="Documentation"></url>
-    <url desc="Support"></url>
-    <url desc="Licensing"></url>
-  </urls>
-  <license>AGPL</license>
-  <maintainer>
-    <author>Adam Moore</author>
-    <email>mail@example.com</email>
-  </maintainer>
-  <releaseDate>2010-12-16</releaseDate>
-  <version>1.0</version>
-  <develStage>stable</develStage>
-  <compatibility><ver>3.3</ver></compatibility>
-  <comments></comments>
-  <typeInfo>
-   <userNameLabel>Purchase Item ID</userNameLabel>
-   <passwordLabel></passwordLabel>
-   <signatureLabel></signatureLabel>
-   <subjectLabel></subjectLabel>
-   <urlSiteDefault>https://live.exmpale.com</urlSiteDefault>
-   <urlApiDefault></urlApiDefault>
-   <urlRecurDefault></urlRecurDefault>
-   <urlSiteTestDefault>https://test.example.com</urlSiteTestDefault>
-   <urlApiTestDefault></urlApiTestDefault>
-   <urlRecurTestDefault></urlRecurTestDefault>
-   <urlButtonDefault></urlButtonDefault>
-   <urlButtonTestDefault></urlButtonTestDefault>
-   <billingMode>notify</billingMode>
-   <isRecur>0</isRecur>
-   <paymentType>1</paymentType>
-  </typeInfo>
-</extension>
-3. Create the default payment processor file
+## Create the default payment processor file
 The methods that exist are different depending on what Billing Mode you used above.
 
-Form
-Method Called:
-doDirectPayment()
+### Form
+#### Method Called:
 
-Notes:
++ doDirectPayment()
 
-If you return to the calling class at the end of the function the contribution will be confirmed. Values from the $params array will be updated based on what you return. If the transaction does not succeed you should return an error to avoid confirming the transaction.
+> Notes:
+>
+> If you return to the calling class at the end of the function the contribution will be confirmed. Values from the $params array will be updated based on what you return. If the transaction does not succeed you should return an error to avoid confirming the transaction.
+ 
+#### Available Parameters:
 
-Available Parameters:
+* qfKey
+* email-(bltID)
+* billing_first_name
+* billing_middle_name
+* billing_last_name
+* location_name = billing_first_name + billing_middle_name + billing_last_name
+* streeet_address
+* city
+* state_province_id
+* state_province
+* postal_code
+* country_id
+* country
+* credit_card_number
+* cvv2 - credit_card_exp_date - M - Y
+* credit_card_type
+* amount
+* amount_other
+* year - credit_card_exp_date year
+* month - credit_card_exp_date month
+* ip_address
+* amount_level
+* currencyID
+* payment_action
+* invoiceID
+* Button
 
-qfKey
-email-(bltID)
-billing_first_name
-billing_middle_name
-billing_last_name
-location_name = billing_first_name + billing_middle_name + billing_last_name
-streeet_address
-city
-state_province_id
-state_province
-postal_code
-country_id
-country
-credit_card_number
-cvv2 - credit_card_exp_date - M - Y
-credit_card_type
-amount
-amount_other
-year - credit_card_exp_date year
-month - credit_card_exp_date month
-ip_address
-amount_level
-currencyID
-payment_action
-invoiceID
-Button
-Method Called:
-setExpressCheckout()
+#### Method Called:
 
-Notes:
-The customer is returned to confirm.php with the rfp value set to 1 and
+* setExpressCheckout()
 
-getExpressCheckoutDetails()
-
-is called when the form is processed
+> Notes:
+> The customer is returned to confirm.php with the rfp value set to 1 and getExpressCheckoutDetails() is called when the form is processed
 
 doExpressCheckout() is called to finalise the payment - a result is returned to the civiCRM site.
 
-Available Parameters:
+#### Available Parameters:
 
-Notify
-Method Called:
-doTransferCheckout()
+---
 
-Notes:
-The details from here are processor specific but you want to pass enough details back to your function to identify the transaction. You should be aiming to have these variables to passthrough the processor to the confirmation routine:
+###Notify
 
-contactID
-contributionID
-contributionTypeID
-invoiceID
-membershipID(contribution only)
-participantID (event only)
-eventID (event only)
-component (event or contribute)
-qfkey
-Available Parameters:
+#### Method Called:
++ doTransferCheckout()
 
-Example:
+> Notes:
+> The details from here are processor specific but you want to pass enough details back to your function to identify the transaction. You should be aiming to have these variables to passthrough the processor to the confirmation routine:
+
+* contactID
+* contributionID
+* contributionTypeID
+* invoiceID
+* membershipID(contribution only)
+* participantID (event only)
+* eventID (event only)
+* component (event or contribute)
+* qfkey
+
+#### Available Parameters:
+
+
+### Example:
 
 Create initial processing file.
 In our example our file name is UCMPaymentCollection so the name of the file we are going to create is UCMPaymentCollection.php
@@ -197,6 +123,7 @@ In our example our file name is UCMPaymentCollection so the name of the file we 
 It should have this basic template.
 
 UCMPaymentCollection.php
+```
 <?php
  
 require_once 'CRM/Core/Payment.php';
@@ -642,6 +569,9 @@ class edu_ucmerced_payment_ucmpaymentcollection_UCMPaymentCollectionIPN extends 
     }
  
 }
+
+```
+
 Let's start out with the minor changes that are necessary
 
 Change the class name to fit your class. You can add any ending just as long as it's consistent everywhere.
