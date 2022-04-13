@@ -206,27 +206,23 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     public function handlePaymentNotification()
     {
 
-        $payloadResponse = $_REQUEST['paymentResponse'];
-        require_once 'CRM/Utils/Array.php';
-        $paymentResponse = CRM_Payment2c2p_Helper::getDecodedPayload64($payloadResponse);
+
+        $encodedPaymentResponse = $_REQUEST['paymentResponse'];
+        $paymentResponse = $this->decodePayload64($encodedPaymentResponse);
 //        CRM_Core_Error::debug_var('paymentResponse', $paymentResponse);
 
+        require_once 'CRM/Utils/Array.php';
         $module = CRM_Utils_Array::value('md', $_GET);
-        $qfKey = CRM_Utils_Array::value('qfKey', $_GET);
         $invoiceId = CRM_Utils_Array::value('inId', $_GET);
-        $orderId = substr($invoiceId, 0, 15);
         $url = CRM_Utils_System::url('civicrm');
+
         switch ($module) {
             case 'contribute':
                 $url = CRM_Utils_System::url('civicrm/contribute');
                 if ($paymentResponse['respCode'] == 2000) {
-                    $query = "UPDATE civicrm_contribution SET trxn_id='" . $orderId . "', contribution_status_id=1 where invoice_id='" . $invoiceId . "'";
-                    CRM_Core_DAO::executeQuery($query);
+                    $this->setContributionStatusRecieved($invoiceId);
                 } else {
-                    $query = "UPDATE civicrm_contribution SET trxn_id='" . $orderId . "', contribution_status_id=4 where invoice_id='" . $invoiceId . "'";
-                    CRM_Core_DAO::executeQuery($query);
-                    CRM_Core_Error::statusBounce(ts($_POST['respDesc']) . ts('2c2p Error:') . 'error', $url, 'error');
-                    return FALSE;
+                    $this->setContributionStatusRejected($invoiceId, $url);
                 }
 
                 break;
@@ -239,14 +235,10 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                     $eventId = CRM_Utils_Array::value('eid', $_GET);
                     $query = "UPDATE civicrm_participant SET status_id = 1 where id =" . $participantId . " AND event_id=" . $eventId;
                     CRM_Core_DAO::executeQuery($query);
-                    $query = "UPDATE civicrm_contribution SET trxn_id='" . $orderId . "', contribution_status_id=1 where invoice_id='" . $invoiceId . "'";
-                    CRM_Core_DAO::executeQuery($query);
 
+                    $this->setContributionStatusRecieved($invoiceId);
                 } else { // error code
-                    $query = "UPDATE civicrm_contribution SET trxn_id='" . $orderId . "', contribution_status_id=4 where invoice_id='" . $invoiceId . "'";
-                    CRM_Core_DAO::executeQuery($query);
-                    CRM_Core_Error::statusBounce(ts($_POST['respDesc']) . ts('2c2p Error:') . 'error', $url, 'error');
-                    return FALSE;
+                    $this->setContributionStatusRejected($invoiceId, $url);
                 }
 
                 break;
@@ -347,6 +339,37 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $tpl = 'CRM/Core/Payment/Payment2c2p.tpl';
         $template->assign('webPaymentUrl', $webPaymentUrl);
         print $template->fetch($tpl);
+    }
+
+    /**
+     * @param $payloadResponse
+     * @return array
+     */
+    public function decodePayload64($payloadResponse): array
+    {
+        $paymentResponse = CRM_Payment2c2p_Helper::getDecodedPayload64($payloadResponse);
+        return $paymentResponse;
+    }
+
+    /**
+     * @param $invoiceId
+     */
+    public function setContributionStatusRecieved($invoiceId): void
+    {
+        $orderId = substr($invoiceId, 0, 15);
+        $query = "UPDATE civicrm_contribution SET trxn_id='" . $orderId . "', contribution_status_id=1 where invoice_id='" . $invoiceId . "'";
+        CRM_Core_DAO::executeQuery($query);
+    }
+
+    /**
+     * @param $invoiceId
+     * @param string $url
+     */
+    public function setContributionStatusRejected($invoiceId, string $url): void
+    {
+        $query = "UPDATE civicrm_contribution SET contribution_status_id=4 where invoice_id='" . $invoiceId . "'";
+        CRM_Core_DAO::executeQuery($query);
+        CRM_Core_Error::statusBounce(ts($_POST['respDesc']) . ts('2c2p Error:') . 'error', $url, 'error');
     }
 
 
