@@ -53,26 +53,16 @@ class CRM_Core_Payment_Payment2c2pTest extends \PHPUnit\Framework\TestCase imple
         return $version;
     }
 
-    public function _testSubmitTransaction()
-    {
-        $submiturl = "";
-        $payment_query = "";
-        $request = $this->processor->submit_transaction();
-
-        $this->assertSame('8.5', $this->processor->getCurrentVersion());
-        return $request;
-    }
-
-    public function _testPaymentTokenRequest()
+    public function testGetPaymentToken()
     {
         $merchantId = 'JT01';        //Get MerchantID when opening account with 2C2P
         $secretKey = 'ECC4E54DBA738857B84A7EBC6B5DC7187B8DA68750E88AB53AAA41F548D6F2D9';    //Get SecretKey from 2C2P PGW Dashboard
         $invoiceNo = '1523953661';
         $description = 'item 1';
-        $amount = 1000.00;
+        $amount = 10.00;
         $currencyCode = 'SGD';
-        $payload = $this->processor->getPaymentTokenRequest($secretKey, $merchantId, $invoiceNo, $description, $amount, $currencyCode);
-        $this->assertSame('{"payload":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJtZXJjaGFudElEIjoiSlQwMSIsImludm9pY2VObyI6IjE1MjM5NTM2NjEiLCJkZXNjcmlwdGlvbiI6Iml0ZW0gMSIsImFtb3VudCI6MTAwMCwiY3VycmVuY3lDb2RlIjoiU0dEIn0.uf01i3faxJhHR7kN6DP9oHcGd3rERvPDC6K9NzINBMU"}', $payload);
+        $payload = $this->processor->createPaymentTokenRequest($secretKey, $merchantId, $invoiceNo, $description, $amount, $currencyCode);
+        $this->assertSame('{"payload":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJtZXJjaGFudElEIjoiSlQwMSIsImludm9pY2VObyI6IjE1MjM5NTM2NjEiLCJkZXNjcmlwdGlvbiI6Iml0ZW0gMSIsImFtb3VudCI6MTAsImN1cnJlbmN5Q29kZSI6IlNHRCIsImZyb250ZW5kUmV0dXJuVXJsIjoiaHR0cDpcL1wvbG9jYWxob3N0OjMzMDZcLyJ9.PmmU8oNf4dwxFPXh9Q6MeidyX4X2XdM1GZAcQ1tSKHY"}', $payload);
         return $payload;
     }
 
@@ -156,7 +146,7 @@ class CRM_Core_Payment_Payment2c2pTest extends \PHPUnit\Framework\TestCase imple
     /**
      * Test making a once off payment
      */
-    public function testSinglePayment(): void
+    public function _testSinglePayment(): void
     {
         $this->setupMockHandler(); //?
         $params = $this->getBillingParams();
@@ -303,13 +293,16 @@ class CRM_Core_Payment_Payment2c2pTest extends \PHPUnit\Framework\TestCase imple
                 'return' => 'id',
             ], 'integer');
         }
-        $paymentProcessor = $this->callAPISuccess('payment_processor', 'get', ['name' => 'demoPayment2c2p']);
-        if (isset($paymentProcessor['id'])) {
-            $paymentProcessor = $this->callAPISuccess('payment_processor', 'create', ['id' => $paymentProcessor['id'], 'is_active' => 1]);
-        } else {
-            $paymentProcessor = $this->callAPISuccess('payment_processor', 'create', $params);
+
+        $paymentProcessorId = $this->checkPaymentProcessorIsPresent();
+
+        if (is_numeric($paymentProcessorId)) {
+            $processorID = $this->activatePaymentProcessor($paymentProcessorId);
         }
-        $processorID = $paymentProcessor['id'];
+
+        if (!is_numeric($paymentProcessorId)) {
+            $processorID = $this->createPaymentProcessor($params);
+        }
         $this->setupMockHandler($processorID);
         $this->ids['PaymentProcessor']['Payment2c2p'] = $processorID;
     }
@@ -383,6 +376,43 @@ class CRM_Core_Payment_Payment2c2pTest extends \PHPUnit\Framework\TestCase imple
         return [
             'USER[4]=test&VENDOR[4]=test&PARTNER[6]=PayPal&PWD[8]=test1234&TENDER[1]=C&TRXTYPE[1]=R&ACCT[16]=4111111111111111&CVV2[3]=123&EXPDATE[4]=1022&ACCTTYPE[4]=Visa&AMT[5]=20.00&CURRENCY[3]=AUD&FIRSTNAME[4]=John&LASTNAME[8]=O\'Connor&STREET[16]=8 Hobbitton Road&CITY[9]=The+Shire&STATE[3]=NSW&ZIP[4]=5010&COUNTRY[3]=AUS&EMAIL[24]=unittesteway@civicrm.org&CUSTIP[9]=127.0.0.1&COMMENT1[4]=4200&COMMENT2[4]=live&INVNUM[3]=xyz&ORDERDESC[17]=Test+Contribution&VERBOSITY[6]=MEDIUM&BILLTOCOUNTRY[3]=AUS&OPTIONALTRX[1]=S&OPTIONALTRXAMT[5]=20.00&ACTION[1]=A&PROFILENAME[19]=RegularContribution&TERM[2]=12&START[8]=' . date('mdY', mktime(0, 0, 0, date("m") + 1, date("d"), date("Y"))) . '&PAYPERIOD[4]=MONT',
         ];
+    }
+
+    /**
+     * @param $paymentProcessorId
+     * @return mixed
+     */
+    public function activatePaymentProcessor($paymentProcessorId)
+    {
+        $this->civicrm_api('PaymentProcessor', 'create', ['id' => $paymentProcessorId, 'is_active' => 1]);
+        $processorID = $paymentProcessorId;
+        return $processorID;
+    }
+
+    /**
+     * @param array $params
+     * @return mixed
+     */
+    public function createPaymentProcessor(array $params)
+    {
+        $paymentProcessor = $this->callAPISuccess('payment_processor', 'create', $params);
+        $processorID = $paymentProcessor['id'];
+        return $processorID;
+    }
+
+    /**
+     * @return bool
+     */
+    public function checkPaymentProcessorIsPresent()
+    {
+        $paymentProcessorId = false;
+        $paymentProcessor = $this->civicrm_api('payment_processor', 'get', [
+            'name' => 'demoPayment2c2p'
+        ]);
+        if (sizeof($paymentProcessor) !== 0) {
+            $paymentProcessorId = $paymentProcessor['id'];
+        }
+        return $paymentProcessorId;
     }
 
 }

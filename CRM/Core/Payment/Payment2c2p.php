@@ -39,6 +39,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      */
     static protected $_mode = null;
 
+    protected $_payment_token = null;
+
     /**
      * Constructor
      *
@@ -136,12 +138,17 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         CRM_Core_Error::statusBounce(ts('This function is not implemented'));
     }
 
+    /**
+     * @param array $params
+     * @param string $component
+     * @return array|void
+     */
     function doTransferCheckout(&$params, $component = 'component')
     {
         $component = strtolower($component);
-        $config = CRM_Core_Config::singleton();
 
         if ($component != 'contribute' && $component != 'event') {
+            //is used only for contribute and event
             CRM_Core_Error::statusBounce(ts('Component is invalid'));
         }
 
@@ -151,35 +158,38 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $invoiceNo = $params['invoiceID'];
         $description = $params['description'];
         $amount = $params['amount'];
-        $currency = 'SGD'; //hardcoded
+        $currency = 'SGD'; //works only with for a while
         $processor_name = $this->_paymentProcessor['signature']; //Get processor_name from 2C2P PGW Dashboard
-//        $params = [];
-//        $params['qfKey'] = '123';
-//        $params['participantID'] = '323';
-//        $params['eventID'] = '232';
-        $returnUrl = $this->getReturnUrl($processor_name, $params, $component);
+        $frontendReturnUrl = $this->getReturnUrl($processor_name, $params, $component);
 
-        $frontendReturnUrl = $returnUrl;
-//        CRM_Core_Error::debug_var('frontendReturnUrl', $frontendReturnUrl);
-        $payload = $this->getPaymentPayload($secretKey,
+
+        /*
+         * 1) Create Token Request
+         * 2) Get Payment encoded Token Response
+         * 3) Get decoded Payment Response
+         * */
+
+        $paymentTokenRequest = $this->createPaymentTokenRequest(
+            $secretKey,
             $merchantId,
             $invoiceNo,
             $description,
             $amount,
             $currency,
-            $frontendReturnUrl);
-//        CRM_Core_Error::debug_var('payload', $payload);
-        $encodedTokenResponse = $this->getEncodedTokenResponse($url, $payload);
-//        CRM_Core_Error::debug_var('encodedTokenResponse', $encodedTokenResponse);
+            $frontendReturnUrl
+        );
+
+        $encodedTokenResponse = $this->getEncodedTokenResponse($url, $paymentTokenRequest);
+
         $decodedTokenResponse = $this->getDecodedTokenResponse($secretKey, $encodedTokenResponse);
         $webPaymentUrl = $decodedTokenResponse['webPaymentUrl'];
+        $paymentToken = $decodedTokenResponse['paymentToken'];
+
+        $this->_paymentToken = $paymentToken;
+        //can be used later to get info about the payment
+
         // Print the tpl to redirect and send POST variables to RedSys Getaway.
-        $template = CRM_Core_Smarty::singleton();
-        $tpl = 'CRM/Core/Payment/Payment2c2p.tpl';
-
-        $template->assign('webPaymentUrl', $webPaymentUrl);
-
-        print $template->fetch($tpl);
+        $this->gotoPaymentGateway($webPaymentUrl);
 
         CRM_Utils_System::civiExit();
 
@@ -188,18 +198,17 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 
     /*
      * 	This is the function which handles the response
-     * when zaakpay redirects the user back to our website
+     * when 2c2p redirects the user back to our website
      * after transaction.
      * Refer to the $this->data['returnURL'] in above function to see how the Url should be created
      */
 
     public function handlePaymentNotification()
     {
-//        CRM_Core_Error::debug_var('request', $_REQUEST);
-//        CRM_Core_Error::debug_var('post', $_POST);
+
         $payloadResponse = $_REQUEST['paymentResponse'];
         require_once 'CRM/Utils/Array.php';
-        $paymentResponse = CRM_Payment2c2p_PaymentTokenRequest::getDecodedPayload64($payloadResponse);
+        $paymentResponse = CRM_Payment2c2p_Helper::getDecodedPayload64($payloadResponse);
 //        CRM_Core_Error::debug_var('paymentResponse', $paymentResponse);
 
         $module = CRM_Utils_Array::value('md', $_GET);
@@ -266,9 +275,18 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         return CRM_Payment2c2p_Helper::base64url_decode($data);
     }
 
-    public function getPaymentPayload($secretkey, $merchant_id, $invoice_no, $description, $amount, $currency, $frontendReturnUrl)
+    public function createPaymentTokenRequest($secretkey,
+                                              $merchant_id,
+                                              $invoice_no,
+                                              $description,
+                                              $amount,
+                                              $currency,
+                                              $frontendReturnUrl = "" )
     {
-        $paymentTokenRequest = new CRM_Payment2c2p_PaymentTokenRequest;
+        if($frontendReturnUrl == ""){
+            $frontendReturnUrl = CRM_Utils_System::baseCMSURL();
+        }
+        $paymentTokenRequest = new CRM_Payment2c2p_Helper;
         $paymentTokenRequest->secretkey = $secretkey;
         $paymentTokenRequest->merchant_id = $merchant_id;
         $paymentTokenRequest->invoice_no = $invoice_no;
@@ -287,12 +305,12 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     public function getDecodedTokenResponse($response, $secretKey, $responseType = "payload")
     {
 
-        return CRM_Payment2c2p_PaymentTokenRequest::getDecodedTokenResponse($response, $secretKey, $responseType);
+        return CRM_Payment2c2p_Helper::getDecodedTokenResponse($response, $secretKey, $responseType);
     }
 
     public function getEncodedTokenResponse($url, $payload)
     {
-        return CRM_Payment2c2p_PaymentTokenRequest::getEncodedTokenResponse($url, $payload);
+        return CRM_Payment2c2p_Helper::getEncodedTokenResponse($url, $payload);
     }
 
     public function getReturnUrl($processor_name, $params, $component = 'contribute')
@@ -318,6 +336,17 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             return $this->data['returnUrl'];
         }
         return $this->data['returnUrl'];
+    }
+
+    /**
+     * @param $webPaymentUrl
+     */
+    public function gotoPaymentGateway($webPaymentUrl): void
+    {
+        $template = CRM_Core_Smarty::singleton();
+        $tpl = 'CRM/Core/Payment/Payment2c2p.tpl';
+        $template->assign('webPaymentUrl', $webPaymentUrl);
+        print $template->fetch($tpl);
     }
 
 
