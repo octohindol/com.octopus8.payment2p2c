@@ -214,7 +214,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         require_once 'CRM/Utils/Array.php';
         $module = CRM_Utils_Array::value('md', $_GET);
         $invoiceId = CRM_Utils_Array::value('inId', $_GET);
-        $url = CRM_Utils_System::url('civicrm');
+        $url = CRM_Utils_System::url('civicrm/thankyou2c2p');
 
         switch ($module) {
             case 'contribute':
