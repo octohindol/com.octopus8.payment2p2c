@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<menu>
+  <item>
+    <path>civicrm/contribute/thankyou2c2p</path>
+    <page_callback>CRM_Payment2c2p_Page_ThankYou</page_callback>
+    <title>ThankYou</title>
+    <access_arguments>*always allow*</access_arguments>
+  </item>
+  <item>
+    <path>civicrm/thankyou2c2p</path>
+    <page_callback>CRM_Payment2c2p_Page_ThankYou2c2p</page_callback>
+    <title>ThankYou2c2p</title>
+    <access_arguments>make online contributions</access_arguments>
+  </item>
+</menu>
