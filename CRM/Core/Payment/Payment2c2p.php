@@ -154,7 +154,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 
         $merchantId = $this->_paymentProcessor['user_name'];        //Get MerchantID when opening account with 2C2P
         $secretKey = $this->_paymentProcessor['password'];    //Get SecretKey from 2C2P PGW Dashboard
-        $url = $this->_paymentProcessor['url_site'];    //Get url_site from 2C2P PGW Dashboard
+        $url = $this->_paymentProcessor['url_site'] . '/payment/4.1/PaymentToken';    //Get url_site from 2C2P PGW Dashboard
         $invoiceNo = $params['invoiceID'];
         $description = $params['description'];
         $amount = $params['amount'];
@@ -214,7 +214,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         require_once 'CRM/Utils/Array.php';
         $module = CRM_Utils_Array::value('md', $_GET);
         $invoiceId = CRM_Utils_Array::value('inId', $_GET);
-        $url = CRM_Utils_System::url('civicrm/thankyou2c2p');
+
+        $url = CRM_Utils_System::url($this->_paymentProcessor['subject']);
 
         switch ($module) {
             case 'contribute':
