@@ -222,7 +222,14 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $module = CRM_Utils_Array::value('md', $_GET);
         $invoiceId = CRM_Utils_Array::value('inId', $_GET);
 
-        $url = CRM_Utils_System::url($this->_paymentProcessor['subject']);
+        /** @var TYPE_NAME $this */
+        $url = CRM_Utils_System::url(
+            $this->_paymentProcessor['subject'], //$path
+            null, //$query
+            true, //$absolute
+            null, //$fragment
+            null, //$htmlize
+            true); //$frontend
 
         switch ($module) {
             case 'contribute':
@@ -255,8 +262,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                 CRM_Core_Error::statusBounce("Could not get module name from request url", $url);
         }
 
-        $url = CRM_Utils_System::url($this->_paymentProcessor['subject']);
-        CRM_Utils_System::redirect($url);
+//        $url = CRM_Utils_System::url($this->_paymentProcessor['subject']);
+        CRM_Utils_System::redirect($this->_paymentProcessor['subject']);
         return TRUE;
     }
 
