@@ -55,6 +55,9 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $this->_mode = $mode;
         $this->_paymentProcessor = $paymentProcessor;
         $this->_processorName = ts('2c2p Payment Processor');
+//        CRM_Core_Error::debug_var('this', $this);
+//        CRM_Core_Error::debug_var('paymentProcessor', $paymentProcessor);
+
     }
 
 
@@ -94,7 +97,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     {
         $processorName = $paymentProcessor['name'];
         if (self::$_singleton[$processorName] === null) {
-            self::$_singleton[$processorName] = new org_civicrm_payment_zaakpay($mode, $paymentProcessor);
+            self::$_singleton[$processorName] = new CRM_Core_Payment_Payment2c2p($mode, $paymentProcessor);
         }
         return self::$_singleton[$processorName];
     }
@@ -159,7 +162,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $description = $params['description'];
         $amount = $params['amount'];
         $currency = 'SGD'; //works only with for a while
-        $processor_name = $this->_paymentProcessor['signature']; //Get processor_name from 2C2P PGW Dashboard
+        $processor_name = $this->_paymentProcessor['name']; //Get processor_name from 2C2P PGW Dashboard
+        $processor_name = $this->_paymentProcessor['name']; //Get processor_name from 2C2P PGW Dashboard
         $frontendReturnUrl = $this->getReturnUrl($processor_name, $params, $component);
 
 
@@ -179,11 +183,14 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             $frontendReturnUrl
         );
 
+//        CRM_Core_Error::debug_var('paymentTokenRequest', $paymentTokenRequest);
         $encodedTokenResponse = $this->getEncodedTokenResponse($url, $paymentTokenRequest);
+//        CRM_Core_Error::debug_var('encodedTokenResponse', $encodedTokenResponse);
 
         $decodedTokenResponse = $this->getDecodedTokenResponse($secretKey, $encodedTokenResponse);
         $webPaymentUrl = $decodedTokenResponse['webPaymentUrl'];
         $paymentToken = $decodedTokenResponse['paymentToken'];
+//        CRM_Core_Error::debug_var('paymentToken', $paymentToken);
 
         $this->_paymentToken = $paymentToken;
         //can be used later to get info about the payment
@@ -219,7 +226,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 
         switch ($module) {
             case 'contribute':
-                $url = CRM_Utils_System::url('civicrm/contribute');
+//                $url = CRM_Utils_System::url('civicrm/contribute');
                 if ($paymentResponse['respCode'] == 2000) {
                     $this->setContributionStatusRecieved($invoiceId);
                 } else {
@@ -229,7 +236,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                 break;
 
             case 'event':
-                $url = CRM_Utils_System::url('civicrm/event');
+//                $url = CRM_Utils_System::url('civicrm/event');
 
                 if ($paymentResponse['respCode'] == 2000) { // success code
                     $participantId = CRM_Utils_Array::value('pid', $_GET);
@@ -248,6 +255,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                 CRM_Core_Error::statusBounce("Could not get module name from request url", $url);
         }
 
+        $url = CRM_Utils_System::url($this->_paymentProcessor['subject']);
         CRM_Utils_System::redirect($url);
         return TRUE;
     }
@@ -274,9 +282,9 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                                               $description,
                                               $amount,
                                               $currency,
-                                              $frontendReturnUrl = "" )
+                                              $frontendReturnUrl = "")
     {
-        if($frontendReturnUrl == ""){
+        if ($frontendReturnUrl == "") {
             $frontendReturnUrl = CRM_Utils_System::baseCMSURL();
         }
         $paymentTokenRequest = new CRM_Payment2c2p_Helper;
