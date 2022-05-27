@@ -626,7 +626,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     public function setContributionStatusRecieved($invoiceId): void
     {
         $orderId = substr($invoiceId, 0, 15);
-        //        $query = "UPDATE civicrm_contribution SET trxn_id='" . $orderId . "', contribution_status_id=1 where invoice_id='" . $invoiceId . "'";
+        $query = "UPDATE civicrm_contribution SET invoice_number='My Bank Name' where invoice_id='" . $invoiceId . "'";
+        CRM_Core_DAO::executeQuery($query);
         $contributionParams = [
             'options' => ['limit' => 1, 'sort' => 'id DESC'],
         ];
@@ -636,8 +637,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         try{
         civicrm_api3('contribution', 'completetransaction',
             ['id' => $contribution['contribution_id'],
-                'trxn_id' => $orderId,
-                'invoice_number' => 'mybank name']);
+                'trxn_id' => $orderId]);
         }    catch (CiviCRM_API3_Exception $e) {
             if (!stristr($e->getMessage(), 'Contribution already completed')) {
                 Civi::log()->debug("2c2p IPN Error Updating contribution: " . $e->getMessage());
