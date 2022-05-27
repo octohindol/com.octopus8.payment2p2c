@@ -10,6 +10,7 @@
   */
 
 use Civi\Payment\Exception\PaymentProcessorException;
+use \Firebase\JWT\JWT;
 
 /**
  * Class CRM_Core_Payment_Payment2c2p.
@@ -202,7 +203,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         exit;
     }
 
-    public function doPayment(&$params, $component = 'contribute') {
+    public function doPayment(&$params, $component = 'contribute')
+    {
         $propertyBag = \Civi\Payment\PropertyBag::cast($params);
         $this->_component = $component;
         $statuses = CRM_Contribute_BAO_Contribution::buildOptions('contribution_status_id', 'validate');
@@ -442,6 +444,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $decodedTokenResponse = $this->getDecodedTokenResponse($secretKey, $encodedTokenResponse);
         $webPaymentUrl = $decodedTokenResponse['webPaymentUrl'];
         $paymentToken = $decodedTokenResponse['paymentToken'];
+        $query = "UPDATE civicrm_contribution SET check_number='$paymentToken' where invoice_id='" . $invoiceNo . "'";
+        CRM_Core_DAO::executeQuery($query);
 //        CRM_Core_Error::debug_var('paymentToken', $paymentToken);
 
         $this->_paymentToken = $paymentToken;
@@ -465,11 +469,22 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      */
     public function handlePaymentNotification()
     {
-
+//        $params = array_merge($_GET, $_REQUEST);
+//        $q = explode('/', CRM_Utils_Array::value('q', $params, ''));
+//        $lastParam = array_pop($q);
+//        if (is_numeric($lastParam)) {
+//            $params['processor_id'] = $lastParam;
+//        }
+//        $paymentProcessor = civicrm_api3('PaymentProcessor', 'get', [
+//            'sequential' => 1,
+//            'id' => $params['processor_id'],
+//            'api.PaymentProcessorType.getvalue' => ['return' => "name"],
+//        ]);
+//        CRM_Core_Error::debug_var('paymentProcessor', $paymentProcessor);
 
         $encodedPaymentResponse = $_REQUEST['paymentResponse'];
         $paymentResponse = $this->decodePayload64($encodedPaymentResponse);
-//        CRM_Core_Error::debug_var('paymentResponse', $paymentResponse);
+////        CRM_Core_Error::debug_var('paymentResponse', $paymentResponse);
 
         require_once 'CRM/Utils/Array.php';
         $module = CRM_Utils_Array::value('md', $_GET);
@@ -563,10 +578,10 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      * @param $response
      * @return array
      */
-    public function getDecodedTokenResponse($response, $secretKey, $responseType = "payload")
+    public function getDecodedTokenResponse($secretKey, $response, $responseType = "payload")
     {
 
-        return CRM_Payment2c2p_TokenRequest::getDecodedTokenResponse($response, $secretKey, $responseType);
+        return CRM_Payment2c2p_TokenRequest::getDecodedTokenResponse($secretKey, $response, $responseType);
     }
 
     public function getEncodedTokenResponse($url, $payload)
@@ -626,19 +641,54 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     public function setContributionStatusRecieved($invoiceId): void
     {
         $orderId = substr($invoiceId, 0, 15);
-        $query = "UPDATE civicrm_contribution SET invoice_number='My Bank Name' where invoice_id='" . $invoiceId . "'";
-        CRM_Core_DAO::executeQuery($query);
         $contributionParams = [
             'options' => ['limit' => 1, 'sort' => 'id DESC'],
         ];
         $contributionParams['invoice_id'] = $invoiceId;
         $contribution = civicrm_api3('Contribution', 'get', $contributionParams)['values'];
         $contribution = reset($contribution);
-        try{
-        civicrm_api3('contribution', 'completetransaction',
-            ['id' => $contribution['contribution_id'],
-                'trxn_id' => $orderId]);
-        }    catch (CiviCRM_API3_Exception $e) {
+        $paymentToken = $contribution['check_number'];
+//        CRM_Core_Error::debug_var('paymentToken', $paymentToken);
+//        CRM_Core_Error::debug_var('paymentProcessor', $this->_paymentProcessor);
+        $url = $this->_paymentProcessor['url_site'] . '/payment/4.1/paymentInquiry';    //Get url_site from 2C2P PGW Dashboard
+        $secretkey = $this->_paymentProcessor['password'];
+        $merchantID =  $this->_paymentProcessor['user_name'];
+        $payload = array(
+            "paymentToken" => $paymentToken,
+            "merchantID" => $merchantID,
+            "invoiceNo" => $invoiceId,
+            "locale" => "en");
+        $inquiryRequestData = $this->encodeJwtData($secretkey, $payload);
+        $encodedTokenResponse = $this->getEncodedTokenResponse($url, $inquiryRequestData);
+        $decodedTokenResponse = $this->getDecodedTokenResponse($secretkey, $encodedTokenResponse);
+        CRM_Core_Error::debug_var('decodedTokenResponse', $decodedTokenResponse);
+//        CRM_Core_Error::debug_var('paymentProcessor', $this->_paymentProcessor);
+        $cardNo = substr($decodedTokenResponse['cardNo'], -4);
+        $cardType = $decodedTokenResponse['cardType'];
+        $channelCode = $decodedTokenResponse['channelCode'];
+        $cardTypeId = 2;
+        $paymentInstrumentId = null;
+        if($cardType=='CREDIT'){
+//            $cardTypeId = 1;
+            $paymentInstrumentId = 1;
+        }
+        if($channelCode=='VI'){
+            $cardTypeId = 1;
+//            $paymentInstrumentId = 1;
+        }
+        $issuerBank = $decodedTokenResponse['issuerBank'];
+        $query = "UPDATE civicrm_contribution SET invoice_number='$issuerBank' where invoice_id='" . $invoiceId . "'";
+        CRM_Core_DAO::executeQuery($query);
+
+        $contributionId = $contribution['id'];
+        try {
+            civicrm_api3('contribution', 'completetransaction',
+                ['id' => $contributionId,
+                    'trxn_id' => $orderId,
+                    'pan_truncation' => $cardNo,
+                    'card_type_id' => $cardTypeId,
+                    'payment_instrument_id' => $paymentInstrumentId]);
+        } catch (CiviCRM_API3_Exception $e) {
             if (!stristr($e->getMessage(), 'Contribution already completed')) {
                 Civi::log()->debug("2c2p IPN Error Updating contribution: " . $e->getMessage());
             }
@@ -658,6 +708,16 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         CRM_Core_Error::statusBounce(ts($_POST['respDesc']) . ts('2c2p Error:') . 'error', $url, 'error');
     }
 
+
+    public function encodeJwtData($secretkey, $payload): string
+    {
+
+        $jwt = JWT::encode($payload, $secretkey);
+
+        $data = '{"payload":"' . $jwt . '"}';
+
+        return $data;
+    }
 
 }
 
