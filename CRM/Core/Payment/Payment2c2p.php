@@ -679,6 +679,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $issuerBank = $decodedTokenResponse['issuerBank'];
         $query = "UPDATE civicrm_contribution SET invoice_number='$issuerBank' where invoice_id='" . $invoiceId . "'";
         CRM_Core_DAO::executeQuery($query);
+        $query = "UPDATE civicrm_contribution SET check_number='' where invoice_id='" . $invoiceId . "'";
+        CRM_Core_DAO::executeQuery($query);
 
         $contributionId = $contribution['id'];
         try {
@@ -703,6 +705,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      */
     public function setContributionStatusRejected($invoiceId, string $url): void
     {
+        $query = "UPDATE civicrm_contribution SET check_number='' where invoice_id='" . $invoiceId . "'";
+        CRM_Core_DAO::executeQuery($query);
         $query = "UPDATE civicrm_contribution SET contribution_status_id=4 where invoice_id='" . $invoiceId . "'";
         CRM_Core_DAO::executeQuery($query);
         CRM_Core_Error::statusBounce(ts($_POST['respDesc']) . ts('2c2p Error:') . 'error', $url, 'error');
