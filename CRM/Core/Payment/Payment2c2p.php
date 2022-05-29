@@ -219,6 +219,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         }
 
         if (CRM_Utils_Array::value('is_recur', $params) == TRUE) {
+            CRM_Core_Error::debug_var('recurParams', $params);
             throw new CRM_Core_Exception(ts('2c2p - recurring payments not implemented'));
         }
 
