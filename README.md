@@ -41,4 +41,4 @@ cv en payment2c2p
 
 ## Known Issues
 
-(* FIXME *)
+0.0.5 - fixed error when Processor Type Name and Processor Name are different
