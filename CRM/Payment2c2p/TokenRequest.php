@@ -315,16 +315,8 @@ loyaltyPoints	 -	 O	List of loyalty points
     /**
      * @return string
      */
-    public function getJwtData(): string
+    public function getJwtData($payload): string
     {
-        $payload = array(
-            "merchantID" => $this->merchantID,
-            "invoiceNo" => $this->invoiceNo,
-            "description" => $this->description,
-            "amount" => $this->amount,
-            "currencyCode" => $this->currencyCode,
-            "frontendReturnUrl" => $this->frontendReturnUrl,
-        );
 
         $jwt = JWT::encode($payload, $this->secretkey);
 
