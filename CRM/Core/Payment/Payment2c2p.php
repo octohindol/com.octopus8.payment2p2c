@@ -392,7 +392,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         }
 
 //        $url = CRM_Utils_System::url($this->_paymentProcessor['subject']);
-//        CRM_Utils_System::redirect($this->_paymentProcessor['subject']);
+        CRM_Utils_System::redirect($url);
         return TRUE;
     }
 
