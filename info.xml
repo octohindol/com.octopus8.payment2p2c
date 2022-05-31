@@ -17,6 +17,7 @@
   <releaseDate>2022-05-31</releaseDate>
   <version>0.1.6</version>
   <develStage>alpha</develStage>
+
   <compatibility>
     <ver>5.9.0</ver>
   </compatibility>
