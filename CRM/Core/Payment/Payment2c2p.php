@@ -17,6 +17,8 @@ use \Firebase\JWT\JWT;
  */
 class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 {
+    const LENTRXNID = 10;
+
     private $data;
     /**
      * @var GuzzleHttp\Client
@@ -39,6 +41,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      * @static
      */
     static protected $_mode = null;
+
 
     protected $_payment_token = null;
 
@@ -232,7 +235,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                 throw new CRM_Core_Exception(ts('2c2p - recurring payments should be set in days'));
             }
             $recurring = true;
-            $invoicePrefix = substr($params['invoiceID'], 0, 12);
+            $invoicePrefix = substr($params['invoiceID'], 0, CRM_Core_Payment_Payment2c2p::LENTRXNID);
             $allowAccumulate = true;
             $maxAccumulateAmount = 30;
             $recurringInterval = intval(CRM_Utils_Array::value('frequency_interval', $params, 0));
@@ -350,7 +353,13 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //            null, //$htmlize
 //            true); //$frontend
 
+        $url = strval($this->_paymentProcessor['subject']);
+        if($url != ""){
+            $url = CRM_Utils_System::url($url,NULL,NULL,true,NULL,NULL,true);
+        }else{
         $url = CRM_Utils_System::url();
+        }
+
         switch ($module) {
             case 'contribute':
 //                $url = CRM_Utils_System::url('civicrm/contribute');
@@ -469,7 +478,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     public function getReturnUrl($processor_id, $processor_name, $params, $component = 'contribute')
     {
         if (!isset($params['orderID'])) {
-            $params['orderID'] = substr($params['invoiceID'], 0, 16);
+            $params['orderID'] = substr($params['invoiceID'], 0, CRM_Core_Payment_Payment2c2p::LENTRXNID);
         }
         if ($component == 'contribute') {
             $this->data['returnUrl'] = CRM_Utils_System::baseCMSURL() .
@@ -517,7 +526,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      */
     public function setContributionStatusRecieved($invoiceId): void
     {
-        $orderId = substr($invoiceId, 0, 15);
+        $trxnId = substr($invoiceId, 0, CRM_Core_Payment_Payment2c2p::LENTRXNID);
         $contributionParams = [
             'options' => ['limit' => 1, 'sort' => 'id DESC'],
         ];
@@ -563,7 +572,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         try {
             civicrm_api3('contribution', 'completetransaction',
                 ['id' => $contributionId,
-                    'trxn_id' => $orderId,
+                    'trxn_id' => $trxnId,
                     'pan_truncation' => $cardNo,
                     'card_type_id' => $cardTypeId,
                     'payment_instrument_id' => $paymentInstrumentId,
