@@ -43,3 +43,4 @@ cv en payment2c2p
 
 0.1.5 - fixed error when Processor Type Name and Processor Name are different
 0.1.6 - transaction id len = 10. Thank you page redirect
+0.1.7 - User name and email autofilled. Canceled Payment -> failed
