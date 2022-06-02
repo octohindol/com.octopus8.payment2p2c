@@ -25,6 +25,207 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      */
     protected $guzzleClient;
 
+    const PAYMENT_RESPONCE = array(
+        "0000" => "Successful",
+        "0001" => "Transaction is pending",
+        "0003" => "Transaction is cancelled",
+        "0999" => "System error",
+        "2001" => "Transaction in progress",
+        "2002" => "Transaction not found",
+        "2003" => "Failed To Inquiry",
+        "4001" => "Refer to card issuer",
+        "4002" => "Refer to issuer's special conditions",
+        "4003" => "Invalid merchant ID",
+        "4004" => "Pick up card",
+        "4005" => "Do not honor",
+        "4006" => "Error",
+        "4007" => "Pick up card, special condition",
+        "4008" => "Honor with ID",
+        "4009" => "Request in progress",
+        "4010" => "Partial amount approved",
+        "4011" => "Approved VIP",
+        "4012" => "Invalid Transaction",
+        "4013" => "Invalid Amount",
+        "4014" => "Invalid Card Number",
+        "4015" => "No such issuer",
+        "4016" => "Approved, Update Track 3",
+        "4017" => "Customer Cancellation",
+        "4018" => "Customer Dispute",
+        "4019" => "Re-enter Transaction",
+        "4020" => "Invalid Response",
+        "4021" => "No Action Taken",
+        "4022" => "Suspected Malfunction",
+        "4023" => "Unacceptable Transaction Fee",
+        "4024" => "File Update Not Supported by Receiver",
+        "4025" => "Unable to Locate Record on File",
+        "4026" => "Duplicate File Update Record",
+        "4027" => "File Update Field Edit Error",
+        "4028" => "File Update File Locked Out",
+        "4029" => "File Update not Successful",
+        "4030" => "Format Error",
+        "4031" => "Bank Not Supported by Switch",
+        "4032" => "Completed Partially",
+        "4033" => "Expired Card - Pick Up",
+        "4034" => "Suspected Fraud - Pick Up",
+        "4035" => "Restricted Card - Pick Up",
+        "4036" => "Allowable PIN Tries Exceeded",
+        "4037" => "No Credit Account",
+        "4038" => "Allowable PIN Tries Exceeded",
+        "4039" => "No Credit Account",
+        "4040" => "Requested Function not Supported",
+        "4041" => "Lost Card - Pick Up",
+        "4042" => "No Universal Amount",
+        "4043" => "Stolen Card - Pick Up",
+        "4044" => "No Investment Account",
+        "4045" => "Settlement Success",
+        "4046" => "Settlement Fail",
+        "4047" => "Cancel Success",
+        "4048" => "Cancel Fail",
+        "4049" => "No Transaction Reference Number",
+        "4050" => "Host Down",
+        "4051" => "Insufficient Funds",
+        "4052" => "No Cheque Account",
+        "4053" => "No Savings Account",
+        "4054" => "Expired Card",
+        "4055" => "Incorrect PIN",
+        "4056" => "No Card Record",
+        "4057" => "Transaction Not Permitted to Cardholder",
+        "4058" => "Transaction Not Permitted to Terminal",
+        "4059" => "Suspected Fraud",
+        "4060" => "Card Acceptor Contact Acquirer",
+        "4061" => "Exceeds Withdrawal Amount Limits",
+        "4062" => "Restricted Card",
+        "4063" => "Security Violation",
+        "4064" => "Original Amount Incorrect",
+        "4065" => "Exceeds Withdrawal Frequency Limit",
+        "4066" => "Card Acceptor Call Acquirer Security",
+        "4067" => "Hard Capture - Pick Up Card at ATM",
+        "4068" => "Response Received Too Late",
+        "4069" => "Reserved",
+        "4070" => "Settle amount cannot exceed authorized amount",
+        "4071" => "Inquiry Record Not Exist",
+        "4072" => "Promotion not allowed in current payment method",
+        "4073" => "Promotion Limit Reached",
+        "4074" => "Reserved",
+        "4075" => "Allowable PIN Tries Exceeded",
+        "4076" => "Invalid Credit Card Format",
+        "4077" => "Invalid Expiry Date Format",
+        "4078" => "Invalid Three Digits Format",
+        "4079" => "Reserved",
+        "4080" => "User Cancellation by Closing Internet Browser",
+        "4081" => "Unable to Authenticate Card Holder",
+        "4082" => "Reserved",
+        "4083" => "Reserved",
+        "4084" => "Reserved",
+        "4085" => "Reserved",
+        "4086" => "ATM Malfunction",
+        "4087" => "No Envelope Inserted",
+        "4088" => "Unable to Dispense",
+        "4089" => "Administration Error",
+        "4090" => "Cut-off in Progress",
+        "4091" => "Issuer or Switch is Inoperative",
+        "4092" => "Financial Insititution Not Found",
+        "4093" => "Trans Cannot Be Completed",
+        "4094" => "Duplicate Transmission",
+        "4095" => "Reconcile Error",
+        "4096" => "System Malfunction",
+        "4097" => "Reconciliation Totals Reset",
+        "4098" => "MAC Error",
+        "4099" => "Unable to Complete Payment",
+        "4110" => "Settled",
+        "4120" => "Refunded",
+        "4121" => "Refund Rejected",
+        "4122" => "Refund Failed",
+        "4130" => "Chargeback",
+        "4131" => "Chargeback Rejected",
+        "4132" => "Chargeback Failed",
+        "4140" => "Transaction Does Not Exist",
+        "4200" => "Tokenization Successful",
+        "4201" => "Tokenization Failed",
+        "5002" => "Timeout",
+        "5003" => "Invalid Message",
+        "5004" => "Invalid Profile (Merchant) ID",
+        "5005" => "Duplicated Invoice",
+        "5006" => "Invalid Amount",
+        "5007" => "Insufficient Balance",
+        "5008" => "Invalid Currency Code",
+        "5009" => "Payment Expired",
+        "5010" => "Payment Canceled By Payer",
+        "5011" => "Invalid Payee ID",
+        "5012" => "Invalid Customer ID",
+        "5013" => "Account Does Not Exist",
+        "5014" => "Authentication Failed",
+        "5015" => "Customer paid more than transaction amount",
+        "5016" => "Customer paid less than transaction amount",
+        "5017" => "Paid Expired",
+        "5018" => "Reserved",
+        "5019" => "No-Action From WebPay",
+        "5998" => "Internal Error",
+        "6012" => "Invalid Transaction",
+        "6101" => "Invalid request message",
+        "6102" => "Required Payload",
+        "6103" => "Invalid JWT data",
+        "6104" => "Required merchantId",
+        "6105" => "Required paymentChannel",
+        "6106" => "Required authCode",
+        "6107" => "Invalid merchantId",
+        "6108" => "Invalid paymentChannel",
+        "6109" => "paymentChannel is not configured",
+        "6110" => "Unable to retrieve usertoken",
+        "7012" => "Invalid Transaction",
+        "9004" => "The value is not valid",
+        "9005" => "Some mandatory fields are missing",
+        "9006" => "This field exceeded its authorized length",
+        "9007" => "Invalid merchant",
+        "9008" => "Invalid payment expiry",
+        "9009" => "Amount is invalid",
+        "9010" => "Invalid Currency Code",
+        "9012" => "paymentItem name is required",
+        "9013" => "paymentItem quantity is required",
+        "9014" => "paymentItem amount is required",
+        "9015" => "Existing Invoice Number",
+        "9035" => "Payment failed",
+        "9037" => "Merchant configuration is missing",
+        "9038" => "Failed To Generate Token",
+        "9039" => "The merchant frontend URL is missing",
+        "9040" => "The token is invalid",
+        "9041" => "Payment token already used",
+        "9042" => "Hash value mismatch",
+        "9057" => "Payment options are invalid",
+        "9058" => "Payment channel invalid",
+        "9059" => "Payment channel unauthorized",
+        "9060" => "Payment channel unconfigured",
+        "9078" => "Promotion code does not exist",
+        "9080" => "Tokenization not allowed",
+        "9088" => "SubMerchant is required",
+        "9089" => "Duplicated SubMerchant",
+        "9090" => "SubMerchant Not Found",
+        "9091" => "Invalid Sub Merchant ID",
+        "9092" => "Invalid Sub Merchant invoiceNo",
+        "9093" => "Existing Sub Merchant Invoice Number",
+        "9094" => "Invalid Sub Merchant Amount",
+        "9095" => "Sub Merchant Amount mismatch",
+        "9901" => "Invalid invoicePrefix",
+        "9902" => "allowAccumulate is required",
+        "9903" => "maxAccumulateAmount is required",
+        "9904" => "recurringInterval or ChargeOnDate is required",
+        "9905" => "recurringCount is required",
+        "9906" => "recurringInterval or ChargeOnDate is required",
+        "9907" => "Invalid ChargeNextDate",
+        "9908" => "Invalid ChargeOnDate",
+        "9909" => "chargeNextDate is required",
+        "9990" => "Request to merchant front end has failed",
+        "9991" => "Request merchant secure has failed",
+        "9992" => "Request payment secure has failed",
+        "9993" => "An unknown error has occured",
+        "9994" => "Request DB service has failed",
+        "9995" => "Request payment service has failed",
+        "9996" => "Request Qwik service has failed",
+        "9997" => "Request user preferences has failed",
+        "9998" => "Request store card has failed",
+        "9999" => "Request to merchant backend has failed"
+    );
+
     /**
      * We only need one instance of this object. So we use the singleton
      * pattern and cache the instance in this variable
@@ -42,8 +243,6 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      */
     static protected $_mode = null;
 
-
-    protected $_payment_token = null;
 
     /**
      * Constructor
@@ -134,115 +333,29 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         }
     }
 
-    function _doDirectPayment(&$params)
-    {
-//        CRM_Core_Error::debug_var('paymentProcessor', $this->_paymentProcessor);
-//        CRM_Core_Error::debug_var('params', $params);
-
-//        print_r($this->_paymentProcessor);
-//        print_r($params);
-//        $this->doTransferCheckout($params, 'component');
-        CRM_Core_Error::statusBounce(ts('This function is not implemented'));
-    }
-
-    /**
-     * @param array $params
-     * @param string $component
-     * @return array|void
-     */
-//    function _doTransferCheckout(&$params, $component = 'component')
-//    {
-//        $component = strtolower($component);
-//
-//        if ($component != 'contribute' && $component != 'event') {
-//            //is used only for contribute and event
-//            CRM_Core_Error::statusBounce(ts('Component is invalid'));
-//        }
-//
-//        $merchantId = $this->_paymentProcessor['user_name'];        //Get MerchantID when opening account with 2C2P
-//        $secretKey = $this->_paymentProcessor['password'];    //Get SecretKey from 2C2P PGW Dashboard
-//        $url = $this->_paymentProcessor['url_site'] . '/payment/4.1/PaymentToken';    //Get url_site from 2C2P PGW Dashboard
-//        $invoiceNo = $params['invoiceID'];
-//        $description = $params['description'];
-//        $amount = $params['amount'];
-//        $currency = 'SGD'; //works only with for a while
-//        $processor_name = $this->_paymentProcessor['name']; //Get processor_name from 2C2P PGW Dashboard
-//        $frontendReturnUrl = $this->getReturnUrl($processor_name, $params, $component);
-//
-//
-//        /*
-//         * 1) Create Token Request
-//         * 2) Get Payment encoded Token Response
-//         * 3) Get decoded Payment Response
-//         * */
-//
-//        $paymentTokenRequest = $this->createPaymentTokenRequest(
-//            $secretKey,
-//            $merchantId,
-//            $invoiceNo,
-//            $description,
-//            $amount,
-//            $currency,
-//            $frontendReturnUrl
-//        );
-//
-////        CRM_Core_Error::debug_var('paymentTokenRequest', $paymentTokenRequest);
-//        $encodedTokenResponse = $this->getEncodedTokenResponse($url, $paymentTokenRequest);
-////        CRM_Core_Error::debug_var('encodedTokenResponse', $encodedTokenResponse);
-//
-//        $decodedTokenResponse = $this->getDecodedTokenResponse($secretKey, $encodedTokenResponse);
-//        $webPaymentUrl = $decodedTokenResponse['webPaymentUrl'];
-//        $paymentToken = $decodedTokenResponse['paymentToken'];
-////        CRM_Core_Error::debug_var('paymentToken', $paymentToken);
-//
-//        $this->_paymentToken = $paymentToken;
-//        //can be used later to get info about the payment
-//
-//        // Print the tpl to redirect and send POST variables to RedSys Getaway.
-//        $this->gotoPaymentGateway($webPaymentUrl);
-//
-//        CRM_Utils_System::civiExit();
-//
-//        exit;
-//    }
 
     public function doPayment(&$params, $component = 'contribute')
     {
-        $propertyBag = \Civi\Payment\PropertyBag::cast($params);
         $this->_component = $component;
         $statuses = CRM_Contribute_BAO_Contribution::buildOptions('contribution_status_id', 'validate');
-
+//        CRM_Core_Error::debug_var('params', $params);
         // If we have a $0 amount, skip call to processor and set payment_status to Completed.
         // Conceivably a processor might override this - perhaps for setting up a token - but we don't
         // have an example of that at the moment.
+
+        $propertyBag = \Civi\Payment\PropertyBag::cast($params);
         if ($propertyBag->getAmount() == 0) {
             $result['payment_status_id'] = array_search('Completed', $statuses);
             $result['payment_status'] = 'Completed';
             return $result;
         }
         $recurring = false;
-        $invoicePrefix = "";
-        $allowAccumulate = true;
-        $maxAccumulateAmount = 30;
-        $recurringInterval = 1;
-        $chargeNextDate = "";
-        $recurringCount = 30;
-        if (CRM_Utils_Array::value('is_recur', $params) == TRUE) {
-            CRM_Core_Error::debug_var('recurParams', $params);
-            if (CRM_Utils_Array::value('frequency_unit', $params) == 'day') {
-                $frequencyUnit = "day";
-            } else {
-                throw new CRM_Core_Exception(ts('2c2p - recurring payments should be set in days'));
-            }
-            $recurring = true;
-            $invoicePrefix = substr($params['invoiceID'], 0, CRM_Core_Payment_Payment2c2p::LENTRXNID);
-            $allowAccumulate = true;
-            $maxAccumulateAmount = 30;
-            $recurringInterval = intval(CRM_Utils_Array::value('frequency_interval', $params, 0));
-            $chargeNextDate = date('dmY');
-            $recurringCount = 30;
-//            throw new CRM_Core_Exception(ts('2c2p - recurring payments not implemented'));
-        }
+//        $invoicePrefix = "";
+//        $allowAccumulate = true;
+//        $maxAccumulateAmount = 12;
+//        $recurringInterval = 30;
+//        $chargeNextDate = "";
+//        $recurringCount = 12;
 
         if (!defined('CURLOPT_SSLCERT')) {
             throw new CRM_Core_Exception(ts('2c2p - Gateway requires curl with SSL support'));
@@ -251,20 +364,53 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         if ($this->_paymentProcessor['billing_mode'] != 4) {
             throw new CRM_Core_Exception(ts('2c2p - Direct payment not implemented'));
         }
-        // 2c2p Merchant ID
-//        $ewayCustomerID = $this->_paymentProcessor['user_name'];
-//        // 2c2p GetToken URL
-//        $gateway_URL = $this->_paymentProcessor['url_site'];
-        $merchantId = $this->_paymentProcessor['user_name'];        //Get MerchantID when opening account with 2C2P
+
         $secretKey = $this->_paymentProcessor['password'];    //Get SecretKey from 2C2P PGW Dashboard
-        $url = $this->_paymentProcessor['url_site'] . '/payment/4.1/PaymentToken';    //Get url_site from 2C2P PGW Dashboard
+
+        $merchantID = $this->_paymentProcessor['user_name'];        //Get MerchantID when opening account with 2C2P
+        $tokenUrl = $this->_paymentProcessor['url_site'] . '/payment/4.1/PaymentToken';    //Get url_site from 2C2P PGW Dashboard
         $invoiceNo = $params['invoiceID'];
         $description = $params['description'];
+        $contact_id = null;
+        $displayName = "";
+        if (array_key_exists("contactID", $params)) {
+            $contact_id = $params['contactID'];
+            if ($contact_id) {
+                $displayName = CRM_Contact_BAO_Contact::displayName($contact_id);
+            }
+        }
+
+        $email = "";
+        if (array_key_exists("email-5", $params)) {
+            $email = $params['email-5'];
+        }
+        if ($email == "") {
+            if (array_key_exists("email", $params)) {
+                $email = $params['email'];
+            }
+        }
         $amount = $params['amount'];
         $currency = 'SGD'; //works only with for a while
         $processor_name = $this->_paymentProcessor['name']; //Get processor_name from 2C2P PGW Dashboard
         $processor_id = $this->_paymentProcessor['id']; //Get processor_name from 2C2P PGW Dashboard
-        $frontendReturnUrl = $this->getReturnUrl($processor_id, $processor_name, $params, $component);
+        $frontendReturnUrl = self::getReturnUrl($processor_id, $processor_name, $params, $component);
+        if (CRM_Utils_Array::value('is_recur', $params) == TRUE) {
+
+            if (CRM_Utils_Array::value('frequency_unit', $params) == 'day') {
+                $frequencyUnit = "day";
+            } else {
+                throw new CRM_Core_Exception(ts('2c2p - recurring payments should be set in days'));
+            }
+            $recurring = true;
+            $invoicePrefix = substr($params['invoiceID'], 0, CRM_Core_Payment_Payment2c2p::LENTRXNID);
+            $allowAccumulate = true;
+            $maxAccumulateAmount = 12;
+            $recurringInterval = intval(CRM_Utils_Array::value('frequency_interval', $params, 0));
+            $date = date('Y-m-d');
+            $chargeNextDate = date('dmY', strtotime($date . ' +1 day'));
+            $recurringCount = 12;
+//            throw new CRM_Core_Exception(ts('2c2p - recurring payments not implemented'));
+        }
 
 
         /*
@@ -273,39 +419,91 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
          * 3) Get decoded Payment Response
          * */
 
-        $paymentTokenRequest = $this->createPaymentTokenRequest(
-            $secretKey,
-            $merchantId,
-            $invoiceNo,
-            $description,
-            $amount,
-            $currency,
-            $frontendReturnUrl,
-            $recurring,
-            $invoicePrefix,
-            $allowAccumulate,
-            $maxAccumulateAmount,
-            $recurringInterval,
-            $chargeNextDate,
-            $recurringCount
+//        $payload = array(
+//            $secretKey,
+//            $merchantID,
+//            $invoiceNo,
+//            $description,
+//            $amount,
+//            $currency,
+//            $frontendReturnUrl,
+//            $recurring,
+//            $invoicePrefix,
+//            $allowAccumulate,
+//            $maxAccumulateAmount,
+//            $recurringInterval,
+//            $chargeNextDate,
+//            $recurringCount
+//        );
+        /*
+         * {
+  "merchantID": "JT01",
+  "invoiceNo": "238493467c6d716",
+  "description": "Online Contribution: Help Support CiviCRM!",
+  "amount": 10,
+  "currencyCode": "SGD",
+  "frontendReturnUrl": "http://localhost:3306/civicrm/payment/ipn?processor_name=Payment2c2p&md=contribute&qfKey=CRMContributeControllerContribution12eq3iuzhm0gogcosogcoo804wwg0kos0cs04skwcws8ws0kwk_2914&inId=118493467c6d716de08da42475ed2a4d&orderId=118493467c6d716d",
+  "recurring": true,
+  "invoicePrefix": "228493467c6d716",
+  "allowAccumulate": true,
+  "maxAccumulateAmount": 50,
+  "recurringInterval": 1,
+  "recurringCount": 5,
+  "chargeNextDate": "02062022"
+}
+         */
+
+        $payload = array(
+            "merchantID" => $merchantID,
+            "invoiceNo" => $invoiceNo,
+            "description" => $description,
+            "amount" => $amount,
+            "currencyCode" => $currency,
+            "frontendReturnUrl" => $frontendReturnUrl,
+            "uiParams" => [
+                "userInfo" => [
+                    "email" => "",
+                    "name" => ""
+                ]
+            ],
         );
 
-        CRM_Core_Error::debug_var('paymentTokenRequest', $paymentTokenRequest);
-        $encodedTokenResponse = $this->getEncodedTokenResponse($url, $paymentTokenRequest);
-        CRM_Core_Error::debug_var('encodedTokenResponse', $encodedTokenResponse);
+        if ($displayName != "") {
+            $payload['uiParams']['userInfo']['name'] = $displayName;
+        }
+        if ($email != "") {
+            $payload['uiParams']['userInfo']['email'] = $email;
+        }
 
-        $decodedTokenResponse = $this->getDecodedTokenResponse($secretKey, $encodedTokenResponse);
+
+        if ($recurring === TRUE) {
+            $payload['recurring'] = TRUE;
+            $payload['invoicePrefix'] = $invoicePrefix;
+            $payload['allowAccumulate'] = $allowAccumulate;
+            $payload['maxAccumulateAmount'] = $maxAccumulateAmount;
+            $payload['recurringInterval'] = $recurringInterval;
+            $payload['chargeNextDate'] = $chargeNextDate;
+            $payload['recurringCount'] = $recurringCount;
+        }
+
+        CRM_Core_Error::debug_var('paymentTokenPayload', $payload);
+
+        $encodedTokenRequest = self::encodeJwtData($secretKey, $payload);
+
+        $decodedTokenResponse = self::getDecodedTokenResponse($tokenUrl, $encodedTokenRequest, $secretKey);
+
         CRM_Core_Error::debug_var('decodedTokenResponse', $decodedTokenResponse);
         $webPaymentUrl = $decodedTokenResponse['webPaymentUrl'];
         $paymentToken = $decodedTokenResponse['paymentToken'];
-        $query = "UPDATE civicrm_contribution SET check_number='$paymentToken' where invoice_id='" . $invoiceNo . "'";
-        CRM_Core_DAO::executeQuery($query);
-//        CRM_Core_Error::debug_var('paymentToken', $paymentToken);
 
-        $this->_paymentToken = $paymentToken;
+        //@todo create payment token
         //can be used later to get info about the payment
 
-        // Print the tpl to redirect and send POST variables to RedSys Getaway.
+
+        if (!empty($invoiceNo)) {
+            self::savePaymentToken($paymentToken, $invoiceNo, $contact_id, $processor_id);
+        }
+        // Print the tpl to redirect and send POST variables to Getaway.
         $this->gotoPaymentGateway($webPaymentUrl);
 
         CRM_Utils_System::civiExit();
@@ -354,10 +552,10 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //            true); //$frontend
 
         $url = strval($this->_paymentProcessor['subject']);
-        if($url != ""){
-            $url = CRM_Utils_System::url($url,NULL,NULL,true,NULL,NULL,true);
-        }else{
-        $url = CRM_Utils_System::url();
+        if ($url != "") {
+            $url = CRM_Utils_System::url($url, NULL, NULL, true, NULL, NULL, true);
+        } else {
+            $url = CRM_Utils_System::url();
         }
 
         switch ($module) {
@@ -402,77 +600,55 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         return CRM_Payment2c2p_Config::PAYMENT_2C2P_VERSION;
     }
 
-    public function base64url_encode($data)
+
+    public function getEncodedResponse($url, $payload)
     {
-        return CRM_Payment2c2p_TokenRequest::base64url_encode($data);
+        $client = $this->getGuzzleClient();
+        $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Guzzle';
+
+
+        try {
+            $response = $client->request('POST', $url, [
+                'body' => $payload,
+                'user_agent' => $user_agent,
+                'headers' => [
+                    'Accept' => 'text/plain',
+                    'Content-Type' => 'application/*+json',
+                    'X-VPS-Timeout' => '45',
+                    'X-VPS-VIT-Integration-Product' => 'CiviCRM',
+                    'X-VPS-Request-ID' => strval(rand(1, 1000000000)),
+                ],
+            ]);
+        } catch (\GuzzleHttp\Exception\GuzzleException $e) {
+            CRM_Core_Error::statusBounce(ts('2c2p Error:') . 'Request error', null, $e->getMessage());
+        }
+        return $response->getBody();
     }
 
-    public function base64url_decode($data)
-    {
-        return CRM_Payment2c2p_TokenRequest::base64url_decode($data);
-    }
-
-    public function createPaymentTokenRequest($secretkey,
-                                              $merchantId,
-                                              $invoiceNo,
-                                              $description,
-                                              $amount,
-                                              $currency,
-                                              $frontendReturnUrl = "",
-                                              $recurring = FALSE,
-                                              $invoicePrefix = "",
-                                              $allowAccumulate = TRUE,
-                                              $maxAccumulateAmount = 30,
-                                              $recurringInterval = 1,
-                                              $chargeNextDate = "",
-                                              $recurringCount = 30)
-    {
-        if ($frontendReturnUrl == "") {
-            $frontendReturnUrl = CRM_Utils_System::baseCMSURL();
-        }
-        $paymentTokenRequest = new CRM_Payment2c2p_TokenRequest;
-        $paymentTokenRequest->secretkey = $secretkey;
-        $paymentTokenRequest->merchantID = $merchantId;
-        $paymentTokenRequest->invoiceNo = $invoiceNo;
-        $paymentTokenRequest->description = $description;
-        $paymentTokenRequest->amount = $amount;
-        $paymentTokenRequest->currencyCode = $currency;
-        $paymentTokenRequest->frontendReturnUrl = $frontendReturnUrl;
-        $payload = array(
-            "merchantID" => $merchantId,
-            "invoiceNo" => $invoiceNo,
-            "description" => $description,
-            "amount" => $amount,
-            "currencyCode" => $currency,
-            "frontendReturnUrl" => $frontendReturnUrl,
-        );
-        if ($recurring === TRUE) {
-            $payload['recurring'] = TRUE;
-            $payload['invoicePrefix'] = $invoicePrefix;
-            $payload['allowAccumulate'] = $allowAccumulate;
-            $payload['maxAccumulateAmount'] = $maxAccumulateAmount;
-            $payload['recurringInterval'] = $recurringInterval;
-            $payload['chargeNextDate'] = $chargeNextDate;
-            $payload['recurringCount'] = $recurringCount;
-        }
-        CRM_Core_Error::debug_var('paymentTokenPayload', $payload);
-        return $paymentTokenRequest->getJwtData($payload);
-    }
 
     /**
      * @param $secretKey
      * @param $response
      * @return array
      */
-    public function getDecodedTokenResponse($secretKey, $response, $responseType = "payload")
+    public function getDecodedResponse($secretKey, $response, $responseType = "payload")
     {
 
-        return CRM_Payment2c2p_TokenRequest::getDecodedTokenResponse($secretKey, $response, $responseType);
-    }
+        $decoded = json_decode($response, true);
+//        CRM_Core_Error::debug_var('decoded', $decoded);
+        if (isset($decoded[$responseType])) {
+            $payloadResponse = $decoded[$responseType];
+            if ($responseType == 'payload') {
+                $decoded_array = self::getDecodedPayloadJWT($secretKey, $payloadResponse);
+            }
+            if ($responseType == 'paymentResponse') {
+                $decoded_array = self::getDecodedPayload64($payloadResponse);
+            }
+            return $decoded_array;
+        } else {
+            return $decoded;
+        }
 
-    public function getEncodedTokenResponse($url, $payload)
-    {
-        return CRM_Payment2c2p_TokenRequest::getEncodedTokenResponse($url, $payload);
     }
 
     public function getReturnUrl($processor_id, $processor_name, $params, $component = 'contribute')
@@ -517,7 +693,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      */
     public function decodePayload64($payloadResponse): array
     {
-        $paymentResponse = CRM_Payment2c2p_TokenRequest::getDecodedPayload64($payloadResponse);
+        $paymentResponse = self::getDecodedPayload64($payloadResponse);
         return $paymentResponse;
     }
 
@@ -526,14 +702,27 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      */
     public function setContributionStatusRecieved($invoiceId): void
     {
+
+
+        //todo recieve only payment
         $trxnId = substr($invoiceId, 0, CRM_Core_Payment_Payment2c2p::LENTRXNID);
+
         $contributionParams = [
             'options' => ['limit' => 1, 'sort' => 'id DESC'],
         ];
+        //this is for single contribution
         $contributionParams['invoice_id'] = $invoiceId;
         $contribution = civicrm_api3('Contribution', 'get', $contributionParams)['values'];
         $contribution = reset($contribution);
-        $paymentToken = $contribution['check_number'];
+        $paymentToken = "";
+        try {
+            $payment_token = civicrm_api3('PaymentToken', 'getsingle', [
+                'masked_account_number' => $invoiceId,
+            ]);
+            $paymentToken = $payment_token['token'];
+        } catch (CiviCRM_API3_Exception $e) {
+            throw new CRM_Core_Exception(ts('2c2p - Could not get payment token'));
+        }
 //        CRM_Core_Error::debug_var('paymentToken', $paymentToken);
 //        CRM_Core_Error::debug_var('paymentProcessor', $this->_paymentProcessor);
         $url = $this->_paymentProcessor['url_site'] . '/payment/4.1/paymentInquiry';    //Get url_site from 2C2P PGW Dashboard
@@ -544,11 +733,20 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             "merchantID" => $merchantID,
             "invoiceNo" => $invoiceId,
             "locale" => "en");
-        $inquiryRequestData = $this->encodeJwtData($secretkey, $payload);
-        $encodedTokenResponse = $this->getEncodedTokenResponse($url, $inquiryRequestData);
-        $decodedTokenResponse = $this->getDecodedTokenResponse($secretkey, $encodedTokenResponse);
+        $inquiryRequestData = self::encodeJwtData($secretkey, $payload);
+        $encodedTokenResponse = self::getEncodedResponse($url, $inquiryRequestData);
+        $decodedTokenResponse = self::getDecodedResponse($secretkey, $encodedTokenResponse);
         CRM_Core_Error::debug_var('decodedTokenResponse', $decodedTokenResponse);
 //        CRM_Core_Error::debug_var('paymentProcessor', $this->_paymentProcessor);
+        $resp_code = $decodedTokenResponse['respCode'];
+        if ($resp_code != "0001") {
+//            throw new CRM_Core_Exception(self::PAYMENT_RESPONCE[$resp_code]);
+//            CRM_Core_Error::statusBounce(ts(self::PAYMENT_RESPONCE[$resp_code] . ts('2c2p Error:') . 'error', $url, 'error'));
+            $query = "UPDATE civicrm_contribution SET contribution_status_id=4 where invoice_id='$invoiceId'";
+            CRM_Core_DAO::executeQuery($query);
+//            CRM_Core_Error::statusBounce(ts($_POST['respDesc']) . ts('2c2p Error:') . 'error', $url, 'error');
+            return;
+        }
         $cardNo = substr($decodedTokenResponse['cardNo'], -4);
         $cardType = $decodedTokenResponse['cardType'];
         $channelCode = $decodedTokenResponse['channelCode'];
@@ -569,6 +767,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         CRM_Core_DAO::executeQuery($query);
 
         $contributionId = $contribution['id'];
+
         try {
             civicrm_api3('contribution', 'completetransaction',
                 ['id' => $contributionId,
@@ -576,7 +775,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                     'pan_truncation' => $cardNo,
                     'card_type_id' => $cardTypeId,
                     'payment_instrument_id' => $paymentInstrumentId,
-                    'processor_id' => $this->_paymentProcessor['id'] ]);
+                    'processor_id' => $this->_paymentProcessor['id']]);
         } catch (CiviCRM_API3_Exception $e) {
             if (!stristr($e->getMessage(), 'Contribution already completed')) {
                 Civi::log()->debug("2c2p IPN Error Updating contribution: " . $e->getMessage());
@@ -600,15 +799,77 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     }
 
 
-    public function encodeJwtData($secretkey, $payload): string
+    public function encodeJwtData($secretKey, $payload): string
     {
 
-        $jwt = JWT::encode($payload, $secretkey);
+        $jwt = JWT::encode($payload, $secretKey);
 
         $data = '{"payload":"' . $jwt . '"}';
 
         return $data;
     }
 
+    /**
+     * @param $secretKey string
+     * @param $payloadResponse string
+     * @return array
+     */
+    private static function getDecodedPayloadJWT($secretKey, $payloadResponse): array
+    {
+        $decodedPayload = JWT::decode($payloadResponse, $secretKey, array('HS256'));
+        $decoded_array = (array)$decodedPayload;
+        return $decoded_array;
+    }
+
+    /**
+     * @param $payloadResponse string
+     * @return array
+     */
+    private static function getDecodedPayload64($payloadResponse): array
+    {
+        $decodedPayloadString = base64_decode($payloadResponse);
+        $decodedPayload = json_decode($decodedPayloadString);
+        $decoded_array = (array)$decodedPayload;
+        return $decoded_array;
+    }
+
+    /**
+     * @param string $url
+     * @param string $paymentTokenRequest
+     * @param $secretKey
+     * @return array
+     */
+    public function getDecodedTokenResponse(string $url, string $paymentTokenRequest, $secretKey): array
+    {
+//        CRM_Core_Error::debug_var('paymentTokenRequest', $paymentTokenRequest);
+        $encodedTokenResponse = $this->getEncodedResponse($url, $paymentTokenRequest);
+//        CRM_Core_Error::debug_var('encodedTokenResponse', $encodedTokenResponse);
+
+        $decodedTokenResponse = self::getDecodedResponse($secretKey, $encodedTokenResponse);
+        return $decodedTokenResponse;
+    }
+
+    /**
+     * @param $paymentToken
+     * @param $invoiceNo
+     * @param $contact_id
+     * @param $processor_id
+     * @throws CRM_Core_Exception
+     * @throws CiviCRM_API3_Exception
+     */
+    public function savePaymentToken($paymentToken, $invoiceNo, $contact_id, $processor_id): void
+    {
+        $payment_token_params = [
+            'token' => $paymentToken,
+            'masked_account_number' => $invoiceNo,
+            'contact_id' => $contact_id,
+            'payment_processor_id' => $processor_id,
+        ];
+        $token_result = civicrm_api3('PaymentToken', 'create', $payment_token_params);
+        // Upon success, save the token table's id back in the recurring record.
+        if (empty($token_result['id'])) {
+            throw new CRM_Core_Exception(ts('2c2p - Could not save payment token'));
+        }
+    }
 }
 
