@@ -486,13 +486,13 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             $payload['recurringCount'] = $recurringCount;
         }
 
-        CRM_Core_Error::debug_var('paymentTokenPayload', $payload);
+//        CRM_Core_Error::debug_var('paymentTokenPayload', $payload);
 
         $encodedTokenRequest = self::encodeJwtData($secretKey, $payload);
 
         $decodedTokenResponse = self::getDecodedTokenResponse($tokenUrl, $encodedTokenRequest, $secretKey);
 
-        CRM_Core_Error::debug_var('decodedTokenResponse', $decodedTokenResponse);
+//        CRM_Core_Error::debug_var('decodedTokenResponse', $decodedTokenResponse);
         $webPaymentUrl = $decodedTokenResponse['webPaymentUrl'];
         $paymentToken = $decodedTokenResponse['paymentToken'];
 
@@ -556,21 +556,29 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //            true); //$frontend
 
         $thanxUrl = strval($this->_paymentProcessor['subject']);
-        if ($thanxUrl != "") {
-            $thanxUrl = CRM_Utils_System::url($thanxUrl, //$path
-            null, //$query
-            true, //$absolute
-            null, //$fragment
-            null, //$htmlize
-            true //$frontend
-            );
-        } else {
+//                CRM_Core_Error::debug_var('thanxUrl1', $thanxUrl);
+//        if ($thanxUrl != "") {
+//            CRM_Core_Error::debug_var('thanxUrl2', $thanxUrl);
+//            $thanxUrl = CRM_Utils_System::url($thanxUrl, //$path
+//            null, //$query
+//            true, //$absolute
+//            null, //$fragment
+//            null, //$htmlize
+//            true //$frontend
+//            );
+//            CRM_Core_Error::debug_var('thanxUrl3', $thanxUrl);
+//        } else {
+//            $thanxUrl = CRM_Utils_System::url();
+//        }
+
+        if ($thanxUrl == null || $thanxUrl == "") {
             $thanxUrl = CRM_Utils_System::url();
+//            CRM_Core_Error::debug_var('thanxUrl1', $thanxUrl);
         }
 
         switch ($module) {
             case 'contribute':
-//                $thanxUrl = CRM_Utils_System::thanxUrl('civicrm/contribute');
+
                 if ($paymentResponse['respCode'] == 2000) {
                     $this->setContributionStatusRecieved($invoiceId);
                 } else {
@@ -580,7 +588,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                 break;
 
             case 'event':
-//                $thanxUrl = CRM_Utils_System::thanxUrl('civicrm/event');
+
 
                 if ($paymentResponse['respCode'] == 2000) { // success code
                     $participantId = CRM_Utils_Array::value('pid', $_GET);
@@ -600,6 +608,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         }
 
 //        $thanxUrl = CRM_Utils_System::thanxUrl($this->_paymentProcessor['subject']);
+//        CRM_Core_Error::debug_var('thanxUrl4', $thanxUrl);
+
         CRM_Utils_System::redirect($thanxUrl);
         return TRUE;
     }
@@ -746,7 +756,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $inquiryRequestData = self::encodeJwtData($secretkey, $payload);
         $encodedTokenResponse = self::getEncodedResponse($url, $inquiryRequestData);
         $decodedTokenResponse = self::getDecodedResponse($secretkey, $encodedTokenResponse);
-        CRM_Core_Error::debug_var('decodedTokenResponse', $decodedTokenResponse);
+//        CRM_Core_Error::debug_var('decodedTokenResponse', $decodedTokenResponse);
 //        CRM_Core_Error::debug_var('paymentProcessor', $this->_paymentProcessor);
         $resp_code = $decodedTokenResponse['respCode'];
         if ($resp_code != "0001") {
