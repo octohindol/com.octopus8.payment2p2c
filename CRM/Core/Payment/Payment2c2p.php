@@ -519,6 +519,10 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      * after transaction.
      * Refer to the $this->data['returnURL'] in above function to see how the Url should be created
      */
+    /**
+     * @return bool
+     * @throws CRM_Core_Exception
+     */
     public function handlePaymentNotification()
     {
 //        $params = array_merge($_GET, $_REQUEST);
@@ -543,7 +547,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $invoiceId = CRM_Utils_Array::value('inId', $_GET);
 
         /** @var TYPE_NAME $this */
-//        $url = CRM_Utils_System::url(
+//        $thanxUrl = CRM_Utils_System::thanxUrl(
 //            $this->_paymentProcessor['subject'], //$path
 //            null, //$query
 //            true, //$absolute
@@ -551,26 +555,32 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //            null, //$htmlize
 //            true); //$frontend
 
-        $url = strval($this->_paymentProcessor['subject']);
-        if ($url != "") {
-            $url = CRM_Utils_System::url($url, NULL, NULL, true, NULL, NULL, true);
+        $thanxUrl = strval($this->_paymentProcessor['subject']);
+        if ($thanxUrl != "") {
+            $thanxUrl = CRM_Utils_System::url($thanxUrl, //$path
+            null, //$query
+            true, //$absolute
+            null, //$fragment
+            null, //$htmlize
+            true //$frontend
+            );
         } else {
-            $url = CRM_Utils_System::url();
+            $thanxUrl = CRM_Utils_System::url();
         }
 
         switch ($module) {
             case 'contribute':
-//                $url = CRM_Utils_System::url('civicrm/contribute');
+//                $thanxUrl = CRM_Utils_System::thanxUrl('civicrm/contribute');
                 if ($paymentResponse['respCode'] == 2000) {
                     $this->setContributionStatusRecieved($invoiceId);
                 } else {
-                    $this->setContributionStatusRejected($invoiceId, $url);
+                    $this->setContributionStatusRejected($invoiceId, $thanxUrl);
                 }
 
                 break;
 
             case 'event':
-//                $url = CRM_Utils_System::url('civicrm/event');
+//                $thanxUrl = CRM_Utils_System::thanxUrl('civicrm/event');
 
                 if ($paymentResponse['respCode'] == 2000) { // success code
                     $participantId = CRM_Utils_Array::value('pid', $_GET);
@@ -580,17 +590,17 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 
                     $this->setContributionStatusRecieved($invoiceId);
                 } else { // error code
-                    $this->setContributionStatusRejected($invoiceId, $url);
+                    $this->setContributionStatusRejected($invoiceId, $thanxUrl);
                 }
 
                 break;
 
             default:
-                CRM_Core_Error::statusBounce("Could not get module name from request url", $url);
+                CRM_Core_Error::statusBounce("Could not get module name from request thanxUrl", $thanxUrl);
         }
 
-//        $url = CRM_Utils_System::url($this->_paymentProcessor['subject']);
-        CRM_Utils_System::redirect($url);
+//        $thanxUrl = CRM_Utils_System::thanxUrl($this->_paymentProcessor['subject']);
+        CRM_Utils_System::redirect($thanxUrl);
         return TRUE;
     }
 
