@@ -536,7 +536,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //            'id' => $params['processor_id'],
 //            'api.PaymentProcessorType.getvalue' => ['return' => "name"],
 //        ]);
-//        CRM_Core_Error::debug_var('paymentProcessor', $paymentProcessor);
+//        CRM_Core_Error::debug_var('paymentProcessor', $this->_paymentProcessor);
 
         $encodedPaymentResponse = $_REQUEST['paymentResponse'];
         $paymentResponse = $this->decodePayload64($encodedPaymentResponse);
@@ -556,7 +556,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //            true); //$frontend
 
         $thanxUrl = strval($this->_paymentProcessor['subject']);
-        $failureUrl = strval($this->_paymentProcessor['signature_label']);
+        $failureUrl = strval($this->_paymentProcessor['signature']);
 //                CRM_Core_Error::debug_var('thanxUrl1', $thanxUrl);
 //        if ($thanxUrl != "") {
 //            CRM_Core_Error::debug_var('thanxUrl2', $thanxUrl);
@@ -586,7 +586,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             case 'contribute':
 
                 if ($paymentResponse['respCode'] == 2000) {
-                    $this->setContributionStatusRecieved($invoiceId);
+                    $this->setContributionStatusRecieved($invoiceId, $thanxUrl, $failureUrl);
                 } else {
                     $this->setContributionStatusRejected($invoiceId, $thanxUrl);
                 }
@@ -724,6 +724,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 
     /**
      * @param $invoiceId
+     * @param $thanxUrl
+     * @param $failureUrl
      */
     public function setContributionStatusRecieved($invoiceId, $thanxUrl, $failureUrl): void
     {
@@ -762,6 +764,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $encodedTokenResponse = self::getEncodedResponse($url, $inquiryRequestData);
         $decodedTokenResponse = self::getDecodedResponse($secretkey, $encodedTokenResponse);
 //        CRM_Core_Error::debug_var('decodedTokenResponse', $decodedTokenResponse);
+//        CRM_Core_Error::debug_var('failureUrl', $failureUrl);
 //        CRM_Core_Error::debug_var('paymentProcessor', $this->_paymentProcessor);
         $resp_code = $decodedTokenResponse['respCode'];
 
