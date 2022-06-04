@@ -759,7 +759,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //        CRM_Core_Error::debug_var('decodedTokenResponse', $decodedTokenResponse);
 //        CRM_Core_Error::debug_var('paymentProcessor', $this->_paymentProcessor);
         $resp_code = $decodedTokenResponse['respCode'];
-        if ($resp_code != "0001") {
+        if ($resp_code != "0000") {
 //            throw new CRM_Core_Exception(self::PAYMENT_RESPONCE[$resp_code]);
 //            CRM_Core_Error::statusBounce(ts(self::PAYMENT_RESPONCE[$resp_code] . ts('2c2p Error:') . 'error', $url, 'error'));
             $query = "UPDATE civicrm_contribution SET contribution_status_id=4 where invoice_id='$invoiceId'";

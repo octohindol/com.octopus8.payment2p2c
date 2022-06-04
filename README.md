@@ -51,4 +51,6 @@ cv en payment2c2p
 
 - 0.1.8 - Thank you page absolute redirect
 
+- 0.1.9 - Payment status ID fixed
+
     
