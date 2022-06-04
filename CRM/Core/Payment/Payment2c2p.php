@@ -556,6 +556,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //            true); //$frontend
 
         $thanxUrl = strval($this->_paymentProcessor['subject']);
+        $failureUrl = strval($this->_paymentProcessor['signature_label']);
 //                CRM_Core_Error::debug_var('thanxUrl1', $thanxUrl);
 //        if ($thanxUrl != "") {
 //            CRM_Core_Error::debug_var('thanxUrl2', $thanxUrl);
@@ -573,6 +574,11 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 
         if ($thanxUrl == null || $thanxUrl == "") {
             $thanxUrl = CRM_Utils_System::url();
+//            CRM_Core_Error::debug_var('thanxUrl1', $thanxUrl);
+        }
+
+        if ($failureUrl == null || $failureUrl == "") {
+            $failureUrl = CRM_Utils_System::url();
 //            CRM_Core_Error::debug_var('thanxUrl1', $thanxUrl);
         }
 
@@ -596,9 +602,9 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                     $query = "UPDATE civicrm_participant SET status_id = 1 where id =$participantId AND event_id=$eventId";
                     CRM_Core_DAO::executeQuery($query);
 
-                    $this->setContributionStatusRecieved($invoiceId);
+                    $this->setContributionStatusRecieved($invoiceId, $thanxUrl, $failureUrl);
                 } else { // error code
-                    $this->setContributionStatusRejected($invoiceId, $thanxUrl);
+                    $this->setContributionStatusRejected($invoiceId, $failureUrl);
                 }
 
                 break;
@@ -610,7 +616,6 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //        $thanxUrl = CRM_Utils_System::thanxUrl($this->_paymentProcessor['subject']);
 //        CRM_Core_Error::debug_var('thanxUrl4', $thanxUrl);
 
-        CRM_Utils_System::redirect($thanxUrl);
         return TRUE;
     }
 
@@ -720,7 +725,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     /**
      * @param $invoiceId
      */
-    public function setContributionStatusRecieved($invoiceId): void
+    public function setContributionStatusRecieved($invoiceId, $thanxUrl, $failureUrl): void
     {
 
 
@@ -759,12 +764,14 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //        CRM_Core_Error::debug_var('decodedTokenResponse', $decodedTokenResponse);
 //        CRM_Core_Error::debug_var('paymentProcessor', $this->_paymentProcessor);
         $resp_code = $decodedTokenResponse['respCode'];
+
         if ($resp_code != "0000") {
 //            throw new CRM_Core_Exception(self::PAYMENT_RESPONCE[$resp_code]);
 //            CRM_Core_Error::statusBounce(ts(self::PAYMENT_RESPONCE[$resp_code] . ts('2c2p Error:') . 'error', $url, 'error'));
             $query = "UPDATE civicrm_contribution SET contribution_status_id=4 where invoice_id='$invoiceId'";
             CRM_Core_DAO::executeQuery($query);
 //            CRM_Core_Error::statusBounce(ts($_POST['respDesc']) . ts('2c2p Error:') . 'error', $url, 'error');
+            CRM_Utils_System::redirect($failureUrl);
             return;
         }
         $cardNo = substr($decodedTokenResponse['cardNo'], -4);
@@ -799,8 +806,11 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         } catch (CiviCRM_API3_Exception $e) {
             if (!stristr($e->getMessage(), 'Contribution already completed')) {
                 Civi::log()->debug("2c2p IPN Error Updating contribution: " . $e->getMessage());
+                CRM_Utils_System::redirect($failureUrl);
+
             }
         }
+        CRM_Utils_System::redirect($thanxUrl);
 
         //        CRM_Core_DAO::executeQuery($query);
     }
