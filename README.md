@@ -53,4 +53,6 @@ cv en payment2c2p
 
 - 0.1.9 - Payment status ID fixed
 
+- 0.1.10 - Failure URL
+
     
