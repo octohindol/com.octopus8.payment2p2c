@@ -2,7 +2,7 @@
 
 ![Screenshot](/images/screenshot.png)
 
-(*FIXME: In one or two paragraphs, describe what the extension does and why one would download it. *)
+This extension provides access to 2c2p Payment gateway
 
 The extension is licensed under [AGPL-3.0](LICENSE.txt).
 
@@ -37,7 +37,9 @@ cv en payment2c2p
 
 ## Getting Started
 
-(* FIXME: Where would a new user navigate to get started? What changes would they see? *)
+All configuration is in the standard Payment Processors settings area in CiviCRM admin.
+You should enter your "Merchant ID", "Secret", "Gateway URL", "Thank You Page URL" and "Failure Page URL".
+
 
 ## Known Issues
 
