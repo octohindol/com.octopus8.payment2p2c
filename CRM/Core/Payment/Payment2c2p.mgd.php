@@ -23,7 +23,7 @@ return [
             'payment_type' => 1,
             'is_recur' => 0,
             'url_site_test_default' => 'https://sandbox-pgw.2c2p.com',
-            'url_site_default' => 'https://sandbox-pgw.2c2p.com',
+            'url_site_default' => 'https://pgw.2c2p.com',
         ],
     ],
 ];
