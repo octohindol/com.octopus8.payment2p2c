@@ -57,6 +57,14 @@ cv en payment2c2p
 
 - 0.1.11 - NRIC added
 
-- 0.1.12 - NRIC only for deductable
+- 0.1.12 - NRIC field is shown only for tax-deductable contributions
 
+- 0.1.13 - new NRIC algorithm:
+    1) If user is present but has empty NRIC - NRIC will be added to this user
+    
+    2) If user is new - NRIC will be added to this user
+    
+    3) If user has NRIC but it differs 
+    from the given NRIC and no new user 
+    is created by profile - new user with noname will be created
     

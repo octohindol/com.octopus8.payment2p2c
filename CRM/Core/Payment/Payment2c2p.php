@@ -382,10 +382,10 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //            CRM_Core_Error::debug_var('is_r_d', $is_deductible);
             $nric = $form->addElement('text',
                 'nric',
-                ts('NRIC'),
+                ts('NRIC/FIN/UEN'),
                 NULL
             );
-            $form->addRule('nric', 'Please enter NRIC', 'required', null, 'client');
+            $form->addRule('nric', 'Please enter NRIC/FIN/UEN', 'required', null, 'client');
             $defaults['nric'] = $external_identifier;
             $form->setDefaults($defaults);
             $form->assign('is_deductible', TRUE);
@@ -402,25 +402,18 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     function doPayment(&$params, $component = 'contribute')
     {
         $this->_component = $component;
-        $statuses = CRM_Contribute_BAO_Contribution::buildOptions('contribution_status_id', 'validate');
-        CRM_Core_Error::debug_var('params', $params);
-        // If we have a $0 amount, skip call to processor and set payment_status to Completed.
-        // Conceivably a processor might override this - perhaps for setting up a token - but we don't
-        // have an example of that at the moment.
+//        CRM_Core_Error::debug_var('params_before', $params);
 
         $propertyBag = \Civi\Payment\PropertyBag::cast($params);
+//        CRM_Core_Error::debug_var('propertyBag', $propertyBag);
         if ($propertyBag->getAmount() == 0) {
+            $statuses = CRM_Contribute_BAO_Contribution::buildOptions('contribution_status_id', 'validate');
             $result['payment_status_id'] = array_search('Completed', $statuses);
             $result['payment_status'] = 'Completed';
             return $result;
         }
         $recurring = false;
-//        $invoicePrefix = "";
-//        $allowAccumulate = true;
-//        $maxAccumulateAmount = 12;
-//        $recurringInterval = 30;
-//        $chargeNextDate = "";
-//        $recurringCount = 12;
+
 
         if (!defined('CURLOPT_SSLCERT')) {
             throw new CRM_Core_Exception(ts('2c2p - Gateway requires curl with SSL support'));
@@ -431,57 +424,70 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         }
 
         $secretKey = $this->_paymentProcessor['password'];    //Get SecretKey from 2C2P PGW Dashboard
-
         $merchantID = $this->_paymentProcessor['user_name'];        //Get MerchantID when opening account with 2C2P
         $tokenUrl = $this->_paymentProcessor['url_site'] . '/payment/4.1/PaymentToken';    //Get url_site from 2C2P PGW Dashboard
+
         $invoiceNo = $params['invoiceID'];
         $description = $params['description'];
         $contact_id = null;
         $displayName = "";
+        $contact = new CRM_Contact_BAO_Contact();
         if (array_key_exists("contactID", $params)) {
             $contact_id = $params['contactID'];
             if ($contact_id) {
                 $displayName = CRM_Contact_BAO_Contact::displayName($contact_id);
+                $contact->id = $contact_id;
+                if ($contact->find(TRUE)) {
+                    $external_identifier = $contact->external_identifier;
+                }
             }
         }
+
         if (array_key_exists("nric", $params)) {
+            //@todo check if new user is created by profile
             $nric = $params['nric'];
-            CRM_Core_Error::debug_var('nric', $nric);
+//            CRM_Core_Error::debug_var('nric', $nric);
             try {
-                $contact = civicrm_api3('Contact', 'getsingle', [
+                $contactNRIC = civicrm_api3('Contact', 'getsingle', [
                     'return' => [
                         "id"],
                     'external_identifier' => $nric
                 ]);
-                CRM_Core_Error::debug_var('contact0', $contact);
-                if ($contact['is_error']) {
+//                CRM_Core_Error::debug_var('contact0', $contactNRIC);
+                if ($contactNRIC['is_error']) {
+                    $contactNRIC = civicrm_api3('Contact', 'create', [
+                        'contact_type' => "Individual",
+                        'external_identifier' => $nric,
+                        'display_name' => 'NRIC ' . $nric,
+                    ]);
+//                    CRM_Core_Error::debug_var('contact1', $contactNRIC);
+                    $contact_id = $contactNRIC['id'];
+                    $params['contactID'] = $contact_id;
+                } else {
+                    $contact_id = $contactNRIC['id'];
+                    $params['contactID'] = $contact_id;
+                }
+            } catch (CiviCRM_API3_Exception $e) {
+                if ($external_identifier == "" or $external_identifier == null) {
+                    $contact->external_identifier = $nric;
+                    $contact->update();
+                } else {
                     $contact = civicrm_api3('Contact', 'create', [
                         'contact_type' => "Individual",
                         'external_identifier' => $nric,
                         'display_name' => 'NRIC ' . $nric,
                     ]);
-                    CRM_Core_Error::debug_var('contact1', $contact);
                     $contact_id = $contact['id'];
                     $params['contactID'] = $contact_id;
-                } else {
-
-                    $contact_id = $contact['id'];
-                    $params['contactID'] = $contact_id;
-                    CRM_Core_Error::debug_var('params1', $params);
                 }
-            } catch (CiviCRM_API3_Exception $e) {
-                $contact = civicrm_api3('Contact', 'create', [
-                    'contact_type' => "Individual",
-                    'external_identifier' => $nric,
-                    'display_name' => 'NRIC ' . $nric,
-                ]);
-                CRM_Core_Error::debug_var('contact1', $contact);
+//                CRM_Core_Error::debug_var('contact_after_error', $contact);
 //                CRM_Core_Error::debug_var('eeee', $e->getErrorCode());
-                $contact_id = $contact['id'];
-                $params['contactID'] = $contact_id;
             }
+//            CRM_Core_Error::debug_var('params_after', $params);
+
             $query = "UPDATE civicrm_contribution SET contact_id = $contact_id where invoice_id='$invoiceNo'";
             CRM_Core_DAO::executeQuery($query);
+
         }
 
         $email = "";
@@ -517,46 +523,6 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //            throw new CRM_Core_Exception(ts('2c2p - recurring payments not implemented'));
         }
 
-
-        /*
-         * 1) Create Token Request
-         * 2) Get Payment encoded Token Response
-         * 3) Get decoded Payment Response
-         * */
-
-//        $payload = array(
-//            $secretKey,
-//            $merchantID,
-//            $invoiceNo,
-//            $description,
-//            $amount,
-//            $currency,
-//            $frontendReturnUrl,
-//            $recurring,
-//            $invoicePrefix,
-//            $allowAccumulate,
-//            $maxAccumulateAmount,
-//            $recurringInterval,
-//            $chargeNextDate,
-//            $recurringCount
-//        );
-        /*
-         * {
-    "merchantID": "JT01",
-    "invoiceNo": "238493467c6d716",
-    "description": "Online Contribution: Help Support CiviCRM!",
-    "amount": 10,
-    "currencyCode": "SGD",
-    "frontendReturnUrl": "http://localhost:3306/civicrm/payment/ipn?processor_name=Payment2c2p&md=contribute&qfKey=CRMContributeControllerContribution12eq3iuzhm0gogcosogcoo804wwg0kos0cs04skwcws8ws0kwk_2914&inId=118493467c6d716de08da42475ed2a4d&orderId=118493467c6d716d",
-    "recurring": true,
-    "invoicePrefix": "228493467c6d716",
-    "allowAccumulate": true,
-    "maxAccumulateAmount": 50,
-    "recurringInterval": 1,
-    "recurringCount": 5,
-    "chargeNextDate": "02062022"
-    }
-         */
 
         $payload = array(
             "merchantID" => $merchantID,
