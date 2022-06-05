@@ -19,6 +19,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 {
     const LENTRXNID = 10;
 
+    protected $_cid; // cid is contact for contact tab. if it's present, contact is freezed
+
     private $data;
     /**
      * @var GuzzleHttp\Client
@@ -333,6 +335,55 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         }
     }
 
+    public function buildForm(&$form)
+    {
+//        CRM_Core_Error::debug_var('form', $form);
+        $financialType = new CRM_Financial_DAO_FinancialType();
+        $financialType->id = $form->_values['financial_type_id'];
+        $financialType->find(TRUE);
+
+        if ($financialType->is_deductible) {
+            $form->assign('is_deductible', TRUE);
+            $form->set('is_deductible', TRUE);
+        }
+
+        $userId = CRM_Core_Session::singleton()->get('userID');
+//        $contactID = 0;
+        $contactID = CRM_Utils_Request::retrieveValue('cid', 'Positive', 0);
+
+        CRM_Core_Error::debug_var('userId', $userId);
+        CRM_Core_Error::debug_var('contactID', $contactID);
+
+//        $this->add('date', 'chargeNextDate', E::ts('Charge Next Date'),
+//            CRM_Core_SelectValues::date(NULL, 'dmY'), TRUE);
+//        $this->add('date', 'chargeOnDate', E::ts('Charge On Date'),
+//            CRM_Core_SelectValues::date(NULL, 'dmY'), TRUE);
+//        $this->add('date', 'paymentExpiry', E::ts('Payment Expiry'),
+//            CRM_Core_SelectValues::date(NULL, 'dmY'), TRUE);
+//        $request3DSarray = array(
+//            "Y" => "do 3ds",
+//            "F" => "force 3ds",
+//            "N" => "no 3ds"
+//        );
+//        $request3DS = $this->add('select', 'request3DS',
+//            E::ts('Use 3ds'),
+//            $request3DSarray,
+//            TRUE, ['class' => 'huge crm-select2']);
+//        $request3DS->setSelected("Y");
+
+        $nric = $form->addElement('text',
+            'nric',
+            ts('NRIC'),
+            NULL
+        );
+        $form->addRule('nric', 'Please enter NRIC', 'required', null, 'client');
+        $defaults['nric'] = '';
+        $form->setDefaults($defaults);
+        CRM_Core_Region::instance('contribution-main-not-you-block')->add(
+            ['template' => 'CRM/Core/Payment/Card.tpl', 'weight' => +11]);
+        return parent::buildForm($form);
+    }
+
 
     public function doPayment(&$params, $component = 'contribute')
     {
@@ -379,6 +430,10 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                 $displayName = CRM_Contact_BAO_Contact::displayName($contact_id);
             }
         }
+        if (array_key_exists("nric", $params)) {
+            $nric = $params['nric'];
+            CRM_Core_Error::debug_var('nric', $nric);
+        }
 
         $email = "";
         if (array_key_exists("email-5", $params)) {
@@ -393,6 +448,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $currency = 'SGD'; //works only with for a while
         $processor_name = $this->_paymentProcessor['name']; //Get processor_name from 2C2P PGW Dashboard
         $processor_id = $this->_paymentProcessor['id']; //Get processor_name from 2C2P PGW Dashboard
+        $params['cid'] = $contact_id;
         $frontendReturnUrl = self::getReturnUrl($processor_id, $processor_name, $params, $component);
         if (CRM_Utils_Array::value('is_recur', $params) == TRUE) {
 
@@ -686,7 +742,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                 "civicrm/payment/ipn?processor_id=$processor_id&processor_name=$processor_name&md=contribute&qfKey=" .
                 $params['qfKey'] .
                 '&inId=' . $params['invoiceID'] .
-                '&orderId=' . $params['orderID'];
+                '&orderId=' . $params['orderID'] .
+                '&cid=' . $params['cid'];
             return $this->data['returnUrl'];
         } else if ($component == 'event') {
             $this->data['returnUrl'] = CRM_Utils_System::baseCMSURL() .
@@ -790,11 +847,11 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             $cardTypeId = 1;
 //            $paymentInstrumentId = 1;
         }
-        $issuerBank = $decodedTokenResponse['issuerBank'];
-        $query = "UPDATE civicrm_contribution SET invoice_number='$issuerBank' where invoice_id='" . $invoiceId . "'";
-        CRM_Core_DAO::executeQuery($query);
-        $query = "UPDATE civicrm_contribution SET check_number='' where invoice_id='" . $invoiceId . "'";
-        CRM_Core_DAO::executeQuery($query);
+//        $issuerBank = $decodedTokenResponse['issuerBank'];
+//        $query = "UPDATE civicrm_contribution SET invoice_number='$issuerBank' where invoice_id='" . $invoiceId . "'";
+//        CRM_Core_DAO::executeQuery($query);
+//        $query = "UPDATE civicrm_contribution SET check_number='' where invoice_id='" . $invoiceId . "'";
+//        CRM_Core_DAO::executeQuery($query);
 
         $contributionId = $contribution['id'];
 

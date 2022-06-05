@@ -1,12 +1,9 @@
+{*  This form redirects to payment portal  *}
+{* don't touch, don't edit *}
+
 <html>
-  <body>    
+  <body>
     <form action="{$webPaymentUrl}" method="get">
-  
-    
-{*    <input type="hidden" name="Ds_SignatureVersion" value="{$version}"/></br>*}
-{*    <input type="hidden" name="Ds_MerchantParameters" value="{$redsysParamsJSON}"/></br>*}
-{*    <input type="hidden" name="Ds_Signature" value="{$signature}"/></br>*}
-  
     </form>
     {literal}
       <script type="text/javascript">

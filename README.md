@@ -55,4 +55,6 @@ cv en payment2c2p
 
 - 0.1.10 - Failure URL
 
+- 0.1.11 - NRIC added
+
     
