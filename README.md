@@ -57,4 +57,6 @@ cv en payment2c2p
 
 - 0.1.11 - NRIC added
 
+- 0.1.12 - NRIC only for deductable
+
     

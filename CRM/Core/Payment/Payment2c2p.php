@@ -341,18 +341,18 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $financialType = new CRM_Financial_DAO_FinancialType();
         $financialType->id = $form->_values['financial_type_id'];
         $financialType->find(TRUE);
+//        CRM_Core_Error::debug_var('financialType', $financialType);
 
+        $is_deductible = FALSE;
         if ($financialType->is_deductible) {
-            $form->assign('is_deductible', TRUE);
-            $form->set('is_deductible', TRUE);
+            $is_deductible = TRUE;
         }
 
         $userId = CRM_Core_Session::singleton()->get('userID');
 //        $contactID = 0;
         $contactID = CRM_Utils_Request::retrieveValue('cid', 'Positive', 0);
 
-        CRM_Core_Error::debug_var('userId', $userId);
-        CRM_Core_Error::debug_var('contactID', $contactID);
+
         $external_identifier = "";
         if ($userId) {
             $contact = new CRM_Contact_BAO_Contact();
@@ -378,21 +378,28 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //            TRUE, ['class' => 'huge crm-select2']);
 //        $request3DS->setSelected("Y");
 
-        $nric = $form->addElement('text',
-            'nric',
-            ts('NRIC'),
-            NULL
-        );
-        $form->addRule('nric', 'Please enter NRIC', 'required', null, 'client');
-        $defaults['nric'] = $external_identifier;
-        $form->setDefaults($defaults);
+        if ($is_deductible === TRUE) {
+//            CRM_Core_Error::debug_var('is_r_d', $is_deductible);
+            $nric = $form->addElement('text',
+                'nric',
+                ts('NRIC'),
+                NULL
+            );
+            $form->addRule('nric', 'Please enter NRIC', 'required', null, 'client');
+            $defaults['nric'] = $external_identifier;
+            $form->setDefaults($defaults);
+            $form->assign('is_deductible', TRUE);
+            $form->set('is_deductible', TRUE);
+        }
         CRM_Core_Region::instance('contribution-main-not-you-block')->add(
             ['template' => 'CRM/Core/Payment/Card.tpl', 'weight' => +11]);
+
         return parent::buildForm($form);
     }
 
 
-    public function doPayment(&$params, $component = 'contribute')
+    public
+    function doPayment(&$params, $component = 'contribute')
     {
         $this->_component = $component;
         $statuses = CRM_Contribute_BAO_Contribution::buildOptions('contribution_status_id', 'validate');
@@ -439,8 +446,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         }
         if (array_key_exists("nric", $params)) {
             $nric = $params['nric'];
-                    CRM_Core_Error::debug_var('nric', $nric);
-            try{
+            CRM_Core_Error::debug_var('nric', $nric);
+            try {
                 $contact = civicrm_api3('Contact', 'getsingle', [
                     'return' => [
                         "id"],
@@ -456,13 +463,13 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                     CRM_Core_Error::debug_var('contact1', $contact);
                     $contact_id = $contact['id'];
                     $params['contactID'] = $contact_id;
-                }else{
+                } else {
 
                     $contact_id = $contact['id'];
                     $params['contactID'] = $contact_id;
                     CRM_Core_Error::debug_var('params1', $params);
                 }
-            }catch (CiviCRM_API3_Exception $e){
+            } catch (CiviCRM_API3_Exception $e) {
                 $contact = civicrm_api3('Contact', 'create', [
                     'contact_type' => "Individual",
                     'external_identifier' => $nric,
@@ -535,20 +542,20 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //        );
         /*
          * {
-  "merchantID": "JT01",
-  "invoiceNo": "238493467c6d716",
-  "description": "Online Contribution: Help Support CiviCRM!",
-  "amount": 10,
-  "currencyCode": "SGD",
-  "frontendReturnUrl": "http://localhost:3306/civicrm/payment/ipn?processor_name=Payment2c2p&md=contribute&qfKey=CRMContributeControllerContribution12eq3iuzhm0gogcosogcoo804wwg0kos0cs04skwcws8ws0kwk_2914&inId=118493467c6d716de08da42475ed2a4d&orderId=118493467c6d716d",
-  "recurring": true,
-  "invoicePrefix": "228493467c6d716",
-  "allowAccumulate": true,
-  "maxAccumulateAmount": 50,
-  "recurringInterval": 1,
-  "recurringCount": 5,
-  "chargeNextDate": "02062022"
-}
+    "merchantID": "JT01",
+    "invoiceNo": "238493467c6d716",
+    "description": "Online Contribution: Help Support CiviCRM!",
+    "amount": 10,
+    "currencyCode": "SGD",
+    "frontendReturnUrl": "http://localhost:3306/civicrm/payment/ipn?processor_name=Payment2c2p&md=contribute&qfKey=CRMContributeControllerContribution12eq3iuzhm0gogcosogcoo804wwg0kos0cs04skwcws8ws0kwk_2914&inId=118493467c6d716de08da42475ed2a4d&orderId=118493467c6d716d",
+    "recurring": true,
+    "invoicePrefix": "228493467c6d716",
+    "allowAccumulate": true,
+    "maxAccumulateAmount": 50,
+    "recurringInterval": 1,
+    "recurringCount": 5,
+    "chargeNextDate": "02062022"
+    }
          */
 
         $payload = array(
@@ -621,7 +628,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      * @return bool
      * @throws CRM_Core_Exception
      */
-    public function handlePaymentNotification()
+    public
+    function handlePaymentNotification()
     {
 //        $params = array_merge($_GET, $_REQUEST);
 //        $q = explode('/', CRM_Utils_Array::value('q', $params, ''));
@@ -718,13 +726,15 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     }
 
 
-    public function getCurrentVersion()
+    public
+    function getCurrentVersion()
     {
         return CRM_Payment2c2p_Config::PAYMENT_2C2P_VERSION;
     }
 
 
-    public function getEncodedResponse($url, $payload)
+    public
+    function getEncodedResponse($url, $payload)
     {
         $client = $this->getGuzzleClient();
         $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Guzzle';
@@ -754,7 +764,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      * @param $response
      * @return array
      */
-    public function getDecodedResponse($secretKey, $response, $responseType = "payload")
+    public
+    function getDecodedResponse($secretKey, $response, $responseType = "payload")
     {
 
         $decoded = json_decode($response, true);
@@ -774,7 +785,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 
     }
 
-    public function getReturnUrl($processor_id, $processor_name, $params, $component = 'contribute')
+    public
+    function getReturnUrl($processor_id, $processor_name, $params, $component = 'contribute')
     {
         if (!isset($params['orderID'])) {
             $params['orderID'] = substr($params['invoiceID'], 0, CRM_Core_Payment_Payment2c2p::LENTRXNID);
@@ -803,7 +815,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     /**
      * @param $webPaymentUrl
      */
-    public function gotoPaymentGateway($webPaymentUrl): void
+    public
+    function gotoPaymentGateway($webPaymentUrl): void
     {
         $template = CRM_Core_Smarty::singleton();
         $tpl = 'CRM/Core/Payment/Payment2c2p.tpl';
@@ -815,7 +828,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      * @param $payloadResponse
      * @return array
      */
-    public function decodePayload64($payloadResponse): array
+    public
+    function decodePayload64($payloadResponse): array
     {
         $paymentResponse = self::getDecodedPayload64($payloadResponse);
         return $paymentResponse;
@@ -826,7 +840,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      * @param $thanxUrl
      * @param $failureUrl
      */
-    public function setContributionStatusRecieved($invoiceId, $thanxUrl, $failureUrl): void
+    public
+    function setContributionStatusRecieved($invoiceId, $thanxUrl, $failureUrl): void
     {
 
 
@@ -921,7 +936,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      * @param $invoiceId
      * @param string $url
      */
-    public function setContributionStatusRejected($invoiceId, string $url): void
+    public
+    function setContributionStatusRejected($invoiceId, string $url): void
     {
         $query = "UPDATE civicrm_contribution SET check_number='' where invoice_id='$invoiceId'";
         CRM_Core_DAO::executeQuery($query);
@@ -931,7 +947,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     }
 
 
-    public function encodeJwtData($secretKey, $payload): string
+    public
+    function encodeJwtData($secretKey, $payload): string
     {
 
         $jwt = JWT::encode($payload, $secretKey);
@@ -946,7 +963,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      * @param $payloadResponse string
      * @return array
      */
-    private static function getDecodedPayloadJWT($secretKey, $payloadResponse): array
+    private
+    static function getDecodedPayloadJWT($secretKey, $payloadResponse): array
     {
         $decodedPayload = JWT::decode($payloadResponse, $secretKey, array('HS256'));
         $decoded_array = (array)$decodedPayload;
@@ -957,7 +975,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      * @param $payloadResponse string
      * @return array
      */
-    private static function getDecodedPayload64($payloadResponse): array
+    private
+    static function getDecodedPayload64($payloadResponse): array
     {
         $decodedPayloadString = base64_decode($payloadResponse);
         $decodedPayload = json_decode($decodedPayloadString);
@@ -971,7 +990,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      * @param $secretKey
      * @return array
      */
-    public function getDecodedTokenResponse(string $url, string $paymentTokenRequest, $secretKey): array
+    public
+    function getDecodedTokenResponse(string $url, string $paymentTokenRequest, $secretKey): array
     {
 //        CRM_Core_Error::debug_var('paymentTokenRequest', $paymentTokenRequest);
         $encodedTokenResponse = $this->getEncodedResponse($url, $paymentTokenRequest);
@@ -989,7 +1009,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      * @throws CRM_Core_Exception
      * @throws CiviCRM_API3_Exception
      */
-    public function savePaymentToken($paymentToken, $invoiceNo, $contact_id, $processor_id): void
+    public
+    function savePaymentToken($paymentToken, $invoiceNo, $contact_id, $processor_id): void
     {
         $payment_token_params = [
             'token' => $paymentToken,

@@ -11,11 +11,14 @@
 
 {*{crmRegion name='form-body'}*}
 
-<div class="crm-section">
-    <div class="label">{$form.nric.label}</div>
-    <div class="content">{$form.nric.html}</div>
-    <div class="clear"></div>
-</div>
+{if $is_deductible }
+{*    {debug}*}
+    <div class="crm-section">
+        <div class="label">{$form.nric.label}</div>
+        <div class="content">{$form.nric.html}</div>
+        <div class="clear"></div>
+    </div>
+
 {*<div class="crm-section">*}
 {*    <div class="label">{$form.request3DS.label}</div>*}
 {*    <div class="content">{$form.request3DS.html}</div>*}
@@ -122,3 +125,4 @@
     {/literal}
 </script>
 
+{/if}
