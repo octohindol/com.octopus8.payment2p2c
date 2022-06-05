@@ -12,4 +12,10 @@
     <title>ThankYou2c2p</title>
     <access_arguments>make online contributions</access_arguments>
   </item>
+  <item>
+    <path>civicrm/payment2c2p/settings</path>
+    <page_callback>CRM_Payment2c2p_Page_ThankYou</page_callback>
+    <title>ThankYou2c2p</title>
+    <access_arguments>make online contributions</access_arguments>
+  </item>
 </menu>

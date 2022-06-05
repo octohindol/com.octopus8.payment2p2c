@@ -353,7 +353,14 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 
         CRM_Core_Error::debug_var('userId', $userId);
         CRM_Core_Error::debug_var('contactID', $contactID);
-
+        $external_identifier = "";
+        if ($userId) {
+            $contact = new CRM_Contact_BAO_Contact();
+            $contact->id = $userId;
+            if ($contact->find(TRUE)) {
+                $external_identifier = $contact->external_identifier;
+            }
+        }
 //        $this->add('date', 'chargeNextDate', E::ts('Charge Next Date'),
 //            CRM_Core_SelectValues::date(NULL, 'dmY'), TRUE);
 //        $this->add('date', 'chargeOnDate', E::ts('Charge On Date'),
@@ -377,7 +384,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             NULL
         );
         $form->addRule('nric', 'Please enter NRIC', 'required', null, 'client');
-        $defaults['nric'] = '';
+        $defaults['nric'] = $external_identifier;
         $form->setDefaults($defaults);
         CRM_Core_Region::instance('contribution-main-not-you-block')->add(
             ['template' => 'CRM/Core/Payment/Card.tpl', 'weight' => +11]);
