@@ -10,17 +10,17 @@
 {* Manually create the CRM.vars.stripe here for drupal webform because \Civi::resources()->addVars() does not work in this context *}
 
 {*{crmRegion name='form-body'}*}
-<h1>GET HERE</h1>
+
 <div class="crm-section">
     <div class="label">{$form.nric.label}</div>
     <div class="content">{$form.nric.html}</div>
     <div class="clear"></div>
 </div>
-<div class="crm-section">
-    <div class="label">{$form.request3DS.label}</div>
-    <div class="content">{$form.request3DS.html}</div>
-    <div class="clear"></div>
-</div>
+{*<div class="crm-section">*}
+{*    <div class="label">{$form.request3DS.label}</div>*}
+{*    <div class="content">{$form.request3DS.html}</div>*}
+{*    <div class="clear"></div>*}
+{*</div>*}
 
 {*{/crmRegion}*}
 
