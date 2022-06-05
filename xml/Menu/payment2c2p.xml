@@ -18,4 +18,10 @@
     <title>ThankYou2c2p</title>
     <access_arguments>make online contributions</access_arguments>
   </item>
+  <item>
+    <path>civicrm/payment2c2p/checkpending</path>
+    <page_callback>CRM_Core_Payment_Payment2c2p::checkPendingContribution</page_callback>
+    <title>Check Pending</title>
+    <access_arguments>make online contributions</access_arguments>
+  </item>
 </menu>

@@ -67,4 +67,12 @@ cv en payment2c2p
     3) If user has NRIC but it differs 
     from the given NRIC and no new user 
     is created by profile - new user with noname will be created
+
+- 0.1.14 - 
+    1) If user cancels the contribution it gets 'Canceled' status
+        ![Screenshot](/images/screenshot-0.1.14-1.png)
+    2) If user does not get back to CiviCRM and the status of Contribution is Pending,
+    administrator now can Update status from 2c2p Server
+        ![Screenshot](/images/screenshot-0.1.14-2.png)
+    
     
