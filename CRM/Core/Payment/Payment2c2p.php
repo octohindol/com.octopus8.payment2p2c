@@ -396,7 +396,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     {
         $this->_component = $component;
         $statuses = CRM_Contribute_BAO_Contribution::buildOptions('contribution_status_id', 'validate');
-//        CRM_Core_Error::debug_var('params', $params);
+        CRM_Core_Error::debug_var('params', $params);
         // If we have a $0 amount, skip call to processor and set payment_status to Completed.
         // Conceivably a processor might override this - perhaps for setting up a token - but we don't
         // have an example of that at the moment.
@@ -439,7 +439,42 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         }
         if (array_key_exists("nric", $params)) {
             $nric = $params['nric'];
-            CRM_Core_Error::debug_var('nric', $nric);
+                    CRM_Core_Error::debug_var('nric', $nric);
+            try{
+                $contact = civicrm_api3('Contact', 'getsingle', [
+                    'return' => [
+                        "id"],
+                    'external_identifier' => $nric
+                ]);
+                CRM_Core_Error::debug_var('contact0', $contact);
+                if ($contact['is_error']) {
+                    $contact = civicrm_api3('Contact', 'create', [
+                        'contact_type' => "Individual",
+                        'external_identifier' => $nric,
+                        'display_name' => 'NRIC ' . $nric,
+                    ]);
+                    CRM_Core_Error::debug_var('contact1', $contact);
+                    $contact_id = $contact['id'];
+                    $params['contactID'] = $contact_id;
+                }else{
+
+                    $contact_id = $contact['id'];
+                    $params['contactID'] = $contact_id;
+                    CRM_Core_Error::debug_var('params1', $params);
+                }
+            }catch (CiviCRM_API3_Exception $e){
+                $contact = civicrm_api3('Contact', 'create', [
+                    'contact_type' => "Individual",
+                    'external_identifier' => $nric,
+                    'display_name' => 'NRIC ' . $nric,
+                ]);
+                CRM_Core_Error::debug_var('contact1', $contact);
+//                CRM_Core_Error::debug_var('eeee', $e->getErrorCode());
+                $contact_id = $contact['id'];
+                $params['contactID'] = $contact_id;
+            }
+            $query = "UPDATE civicrm_contribution SET contact_id = $contact_id where invoice_id='$invoiceNo'";
+            CRM_Core_DAO::executeQuery($query);
         }
 
         $email = "";
