@@ -485,14 +485,15 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                 ]);
 //                CRM_Core_Error::debug_var('contact0', $contactNRIC);
                 if ($contactNRIC['is_error']) {
-                    $contactNRIC = civicrm_api3('Contact', 'create', [
-                        'contact_type' => "Individual",
-                        'external_identifier' => $nric,
-                        'display_name' => 'NRIC ' . $nric,
-                    ]);
-//                    CRM_Core_Error::debug_var('contact1', $contactNRIC);
-                    $contact_id = $contactNRIC['id'];
-                    $params['contactID'] = $contact_id;
+                    CRM_Core_Error::debug_var('error', 'no such NRIC');
+//                    $contactNRIC = civicrm_api3('Contact', 'create', [
+//                        'contact_type' => "Individual",
+//                        'external_identifier' => $nric,
+//                        'display_name' => 'NRIC ' . $nric,
+//                    ]);
+//
+//                    $contact_id = $contactNRIC['id'];
+//                    $params['contactID'] = $contact_id;
                 } else {
                     $contact_id = $contactNRIC['id'];
                     $params['contactID'] = $contact_id;
@@ -502,13 +503,14 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                     $contact->external_identifier = $nric;
                     $contact->update();
                 } else {
-                    $contact = civicrm_api3('Contact', 'create', [
-                        'contact_type' => "Individual",
-                        'external_identifier' => $nric,
-                        'display_name' => 'NRIC ' . $nric,
-                    ]);
-                    $contact_id = $contact['id'];
-                    $params['contactID'] = $contact_id;
+                    CRM_Core_Error::debug_var('error', 'absent NRIC');
+//                    $contact = civicrm_api3('Contact', 'create', [
+//                        'contact_type' => "Individual",
+//                        'external_identifier' => $nric,
+//                        'display_name' => 'NRIC ' . $nric,
+//                    ]);
+//                    $contact_id = $contact['id'];
+//                    $params['contactID'] = $contact_id;
                 }
 //                CRM_Core_Error::debug_var('contact_after_error', $contact);
 //                CRM_Core_Error::debug_var('eeee', $e->getErrorCode());
