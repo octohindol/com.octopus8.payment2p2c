@@ -77,4 +77,8 @@ You should enter your "Merchant ID", "Secret", "Gateway URL", "Thank You Page UR
     administrator now can Update status from 2c2p Server
         ![Screenshot](/images/screenshot-0.1.14-2.png)
     
-- 0.1.15 - Absent NRIC is ignored. User should use 'Create on behalf' to create user with a new NRIC    
+- 0.1.15 - Absent NRIC is ignored. User should use 'Create on behalf' to create user with a new NRIC    - 0.1.15 - Absent NRIC is ignored. User should use 'Create on behalf' to create user with a new NRIC    
+
+- 0.1.16 beta - Started procs to load-unload commands for recurring payment.
+    Recurring payments can be created, but they are managed yet only via 2c2p admin dashboard
+

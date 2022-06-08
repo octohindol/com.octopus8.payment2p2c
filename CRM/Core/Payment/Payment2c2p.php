@@ -432,10 +432,10 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     function doPayment(&$params, $component = 'contribute')
     {
         $this->_component = $component;
-//        CRM_Core_Error::debug_var('params_before', $params);
+        CRM_Core_Error::debug_var('params_before', $params);
 
         $propertyBag = \Civi\Payment\PropertyBag::cast($params);
-//        CRM_Core_Error::debug_var('propertyBag', $propertyBag);
+        CRM_Core_Error::debug_var('propertyBag', $propertyBag);
         if ($propertyBag->getAmount() == 0) {
             $statuses = CRM_Contribute_BAO_Contribution::buildOptions('contribution_status_id', 'validate');
             $result['payment_status_id'] = array_search('Completed', $statuses);
@@ -547,11 +547,11 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             $recurring = true;
             $invoicePrefix = substr($params['invoiceID'], 0, CRM_Core_Payment_Payment2c2p::LENTRXNID);
             $allowAccumulate = true;
-            $maxAccumulateAmount = 12;
+            $maxAccumulateAmount = 1;
             $recurringInterval = intval(CRM_Utils_Array::value('frequency_interval', $params, 0));
             $date = date('Y-m-d');
             $chargeNextDate = date('dmY', strtotime($date . ' +1 day'));
-            $recurringCount = 12;
+            $recurringCount = 1;
 //            throw new CRM_Core_Exception(ts('2c2p - recurring payments not implemented'));
         }
 
@@ -589,7 +589,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             $payload['recurringCount'] = $recurringCount;
         }
 
-//        CRM_Core_Error::debug_var('paymentTokenPayload', $payload);
+        CRM_Core_Error::debug_var('paymentTokenPayload', $payload);
 
         $encodedTokenRequest = self::encodeJwtData($secretKey, $payload);
 
@@ -859,13 +859,28 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $encodedTokenResponse = self::getEncodedResponse($url, $inquiryRequestData);
 //        CRM_Core_Error::debug_var('encodedTokenResponse', $encodedTokenResponse);
         $decodedTokenResponse = self::getDecodedResponse($secretkey, $encodedTokenResponse);
-//        CRM_Core_Error::debug_var('decodedTokenResponse', $decodedTokenResponse);
+        CRM_Core_Error::debug_var('decodedTokenResponse', $decodedTokenResponse);
 //        CRM_Core_Error::debug_var('url', $url);
         $resp_code = $decodedTokenResponse['respCode'];
 //        CRM_Core_Error::debug_var('resp_code', $resp_code);
-
+/*
+ *     [recurringUniqueID] => 170959
+    [tranRef] => 4990727
+    [referenceNo] => 4606096
+ */
+        $tranRef = $decodedTokenResponse['tranRef'];
+        $recurringUniqueID = $decodedTokenResponse['recurringUniqueID'];
+        $referenceNo = $decodedTokenResponse['referenceNo'];
+        $query = "UPDATE civicrm_payment_token SET 
+                                billing_first_name='$recurringUniqueID',
+                                 billing_middle_name='$tranRef',
+                                 billing_last_name='$referenceNo'
+                      where masked_account_number='$invoiceId'";
+        CRM_Core_DAO::executeQuery($query);
         if ($resp_code != "0000") {
-//            throw new CRM_Core_Exception(self::PAYMENT_RESPONCE[$resp_code]);
+//        CRM_Core_Error::debug_var('decodedTokenResponse', $decodedTokenResponse);
+
+            //            throw new CRM_Core_Exception(self::PAYMENT_RESPONCE[$resp_code]);
 //            CRM_Core_Error::statusBounce(ts(self::PAYMENT_RESPONCE[$resp_code] . ts('2c2p Error:') . 'error', $url, 'error'));
             $contribution_status_id = 4;
             if ($resp_code == "0003") {
