@@ -580,6 +580,16 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 
 
         if ($recurring === TRUE) {
+            $intervaldays = 1;
+            if($params['frequency_unit'] == 'week'){
+                $intervaldays = 7;
+            }
+            if($params['frequency_unit'] == 'month'){
+                $intervaldays = 30;
+            }
+            $recurringCount = $params['installments'];
+            $recurringInterval = $params['frequency_interval'] * $intervaldays;
+            $chargeNextDate = $chargeNextDate = date('dmY', strtotime($date . " +$intervaldays day"));
             $payload['recurring'] = TRUE;
             $payload['invoicePrefix'] = $invoicePrefix;
             $payload['allowAccumulate'] = $allowAccumulate;
