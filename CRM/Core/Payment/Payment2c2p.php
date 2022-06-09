@@ -410,12 +410,19 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 
         if ($is_deductible === TRUE) {
 //            CRM_Core_Error::debug_var('is_r_d', $is_deductible);
+
             $nric = $form->addElement('text',
                 'nric',
                 ts('NRIC/FIN/UEN'),
                 NULL
             );
             $form->addRule('nric', 'Please enter NRIC/FIN/UEN', 'required', null, 'client');
+            if(($userId != null) //if there is user
+                AND ($external_identifier != "") //if he has NRIC
+                AND ($userId == $contactID) //if it's his profile
+            ){
+                $nric->freeze();
+            }
             $defaults['nric'] = $external_identifier;
             $form->setDefaults($defaults);
             $form->assign('is_deductible', TRUE);
