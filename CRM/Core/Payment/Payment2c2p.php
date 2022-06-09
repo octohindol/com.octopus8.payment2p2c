@@ -538,12 +538,12 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $params['cid'] = $contact_id;
         $frontendReturnUrl = self::getReturnUrl($processor_id, $processor_name, $params, $component);
         if (CRM_Utils_Array::value('is_recur', $params) == TRUE) {
-
-            if (CRM_Utils_Array::value('frequency_unit', $params) == 'day') {
-                $frequencyUnit = "day";
-            } else {
-                throw new CRM_Core_Exception(ts('2c2p - recurring payments should be set in days'));
-            }
+//
+//            if (CRM_Utils_Array::value('frequency_unit', $params) == 'day') {
+//                $frequencyUnit = "day";
+//            } else {
+//                throw new CRM_Core_Exception(ts('2c2p - recurring payments should be set in days'));
+//            }
             $recurring = true;
             $invoicePrefix = substr($params['invoiceID'], 0, CRM_Core_Payment_Payment2c2p::LENTRXNID);
             $allowAccumulate = true;
