@@ -562,6 +562,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             "description" => $description,
             "amount" => $amount,
             "currencyCode" => $currency,
+            "request3DS" => "F",
             "frontendReturnUrl" => $frontendReturnUrl,
             "uiParams" => [
                 "userInfo" => [
