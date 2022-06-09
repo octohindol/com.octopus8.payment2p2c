@@ -84,3 +84,5 @@ You should enter your "Merchant ID", "Secret", "Gateway URL", "Thank You Page UR
 
 - 0.1.17 beta - 3D forced payments.
 
+- 0.1.18 beta - NRIC is freezed for users with NRIC. To pay for somebody else user should use link.
+
