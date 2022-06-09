@@ -417,11 +417,12 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                 NULL
             );
             $form->addRule('nric', 'Please enter NRIC/FIN/UEN', 'required', null, 'client');
-            if(($userId != null) //if there is user
+            if (($userId != null) //if there is user
                 AND ($external_identifier != "") //if he has NRIC
-                AND ($userId == $contactID) //if it's his profile
-            ){
-                $nric->freeze();
+            ) {
+                IF ($contactID !== 0) { //if it's his profile
+                    $nric->freeze();
+                }
             }
             $defaults['nric'] = $external_identifier;
             $form->setDefaults($defaults);
@@ -589,10 +590,10 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 
         if ($recurring === TRUE) {
             $intervaldays = 1;
-            if($params['frequency_unit'] == 'week'){
+            if ($params['frequency_unit'] == 'week') {
                 $intervaldays = 7;
             }
-            if($params['frequency_unit'] == 'month'){
+            if ($params['frequency_unit'] == 'month') {
                 $intervaldays = 30;
             }
             $recurringCount = $params['installments'];
@@ -881,11 +882,11 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //        CRM_Core_Error::debug_var('url', $url);
         $resp_code = $decodedTokenResponse['respCode'];
 //        CRM_Core_Error::debug_var('resp_code', $resp_code);
-/*
- *     [recurringUniqueID] => 170959
-    [tranRef] => 4990727
-    [referenceNo] => 4606096
- */
+        /*
+         *     [recurringUniqueID] => 170959
+            [tranRef] => 4990727
+            [referenceNo] => 4606096
+         */
         $tranRef = $decodedTokenResponse['tranRef'];
         $recurringUniqueID = $decodedTokenResponse['recurringUniqueID'];
         $referenceNo = $decodedTokenResponse['referenceNo'];
