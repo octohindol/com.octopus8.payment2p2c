@@ -266,6 +266,185 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     }
 
     /**
+     * @param string|null $unencrypted_payload
+     * @param $secretKey
+     * @return array
+     * @throws CRM_Core_Exception
+     */
+    protected static function unencryptRecurringPaymentAnswer(?string $unencrypted_payload, $secretKey): array
+    {
+        $resXml = simplexml_load_string($unencrypted_payload);
+        $array = json_decode(json_encode((array)simplexml_load_string($xml)), $resXml);
+        print_r($array);
+        $res_version = (string)$resXml->version;
+        $res_timeStamp = (string)$resXml->timeStamp;
+        $res_respCode = (string)$resXml->respCode;
+        $res_respReason = (string)$resXml->respReason;
+        $res_recurringUniqueID = (string)$resXml->recurringUniqueID;
+        $res_recurringStatus = (string)$resXml->recurringStatus;
+        $res_invoicePrefix = (string)$resXml->invoicePrefix;
+        $res_currency = (int)$resXml->currency;
+        $res_amount = (int)$resXml->amount;
+        $res_maskedCardNo = (string)$resXml->maskedCardNo;
+        $res_allowAccumulate = (boolean)$resXml->allowAccumulate;
+        $res_maxAccumulateAmount = (int)$resXml->maxAccumulateAmount;
+        $res_recurringInterval = (int)$resXml->recurringInterval;
+        $res_recurringCount = (int)$resXml->recurringCount;
+        $res_currentCount = (int)$resXml->currentCount;
+        $res_chargeNextDate = (string)$resXml->chargeNextDate;
+
+
+//Compute response hash
+        $res_stringToHash =
+            $res_version
+            . $res_respCode
+            . $res_recurringUniqueID
+            . $res_recurringStatus
+            . $res_invoicePrefix
+            . $res_currency
+            . $res_amount
+            . $res_maskedCardNo
+            . $res_allowAccumulate
+            . $res_maxAccumulateAmount
+            . $res_recurringInterval
+            . $res_recurringCount
+            . $res_currentCount
+            . $res_chargeNextDate;
+
+        $res_responseHash = strtoupper(hash_hmac('sha1', $res_stringToHash, $secretKey, false));    //Compute hash value
+
+        if (strtolower($resXml->hashValue) != strtolower($res_responseHash)) {
+            throw new CRM_Core_Exception(ts('2c2p - Unvalid Response Hash'));
+        }
+
+        $answer = [
+            'version' => $res_version,
+            'timeStamp' => $res_timeStamp,
+            'respCode' => $res_respCode,
+            'respReason' => $res_respReason,
+            'recurringUniqueID' => $res_recurringUniqueID,
+            'recurringStatus' => $res_recurringStatus,
+            'invoicePrefix' => $res_invoicePrefix,
+            'currency' => $res_currency,
+            'amount' => $res_amount,
+            'maskedCardNo' => $res_maskedCardNo,
+            'allowAccumulate' => $res_allowAccumulate,
+            'maxAccumulateAmount' => $res_maxAccumulateAmount,
+            'recurringInterval' => $res_recurringInterval,
+            'recurringCount' => $res_recurringCount,
+            'currentCount' => $res_currentCount,
+            'chargeNextDate' => $res_chargeNextDate,
+        ];
+        return $answer;
+    }
+
+    /**
+     * @param string|null $unencrypted_payload
+     * @param $secretKey
+     * @return array
+     * @throws CRM_Core_Exception
+     */
+    protected static function unencryptPaymentAnswer(?string $unencrypted_payload, $secretKey): array
+    {
+
+//        $resXml = simplexml_load_string($unencrypted_payload);
+        $answer = json_decode(json_encode((array)simplexml_load_string($unencrypted_payload)), $unencrypted_payload);
+        $answer = array_map(function($o){
+            if(is_array($o)){
+                if(sizeof($o) == 0)
+                {
+                    return "";
+                }else{
+                    return array_map("strval", $o);
+                }
+            }
+            return (string)$o;}, $answer);
+//        $answer = array_map('strval', $answer);
+        /*
+
+                 * */
+//        $resXml = simplexml_load_string($unencrypted_payload);
+//        $res_version = (string)$resXml->version;
+//        $res_timeStamp = (string)$resXml->timeStamp;
+//        $res_respCode = (string)$resXml->respCode;
+//        $res_respDesc = (string)$resXml->respDesc;
+//        $res_processType = (string)$resXml->processType;
+//        $res_invoiceNo = (string)$resXml->invoiceNo;
+//        $res_amount = (float)$resXml->amount;
+//        $res_status = (string)$resXml->status;
+//        $res_approvalCode = (string)$resXml->approvalCode;
+//        $res_referenceNo = (string)$resXml->referenceNo;
+//        $res_transactionDateTime = (int)$resXml->transactionDateTime;
+//        $res_maskedPan = (int)$resXml->maskedPan;
+//        $res_eci = (int)$resXml->eci;
+//        $res_paymentScheme = (int)$resXml->paymentScheme;
+//        $res_processBy = (string)$resXml->processBy;
+//        $res_userDefined1 = (string)$resXml->userDefined1;
+//        $res_userDefined2 = (string)$resXml->userDefined2;
+//        $res_userDefined3 = (string)$resXml->userDefined3;
+//        $res_userDefined4 = (string)$resXml->userDefined4;
+//        $res_userDefined5 = (string)$resXml->userDefined5;
+
+
+////Compute response hash
+//        $res_stringToHash =
+//            $res_version
+//            . $res_respCode
+//            . $res_timeStamp
+//            . $res_respCode
+//            . $res_respDesc
+//            . $res_processType
+//            . $res_invoiceNo
+//            . $res_amount
+//            . $res_status
+//            . $res_approvalCode
+//            . $res_referenceNo
+//            . $res_transactionDateTime
+//            . $res_maskedPan
+//            . $res_eci
+//            . $res_paymentScheme
+//            . $res_eci
+//            . $res_processBy
+//            . $res_userDefined1
+//            . $res_userDefined2
+//            . $res_userDefined3
+//            . $res_userDefined4
+//            . $res_userDefined5;
+
+//        $res_responseHash = strtoupper(hash_hmac('sha1', $res_stringToHash, $secretKey, false));    //Compute hash value
+//
+//        if (strtolower($resXml->hashValue) != strtolower($res_responseHash)) {
+////            throw new CRM_Core_Exception(ts('2c2p - Unvalid Response Hash'));
+//            print(ts('2c2p - Unvalid Response Hash'));
+//        }
+
+//        $answer = [
+//            'version' => $res_version,
+//            'timeStamp' => $res_timeStamp,
+//            'respCode' => $res_respCode,
+//            'respDesc' => $res_respDesc,
+//            'processType' => $res_processType,
+//            'invoiceNo' => $res_invoiceNo,
+//            'amount' => $res_amount,
+//            'status' => $res_status,
+//            'approvalCode' => $res_approvalCode,
+//            'referenceNo' => $res_referenceNo,
+//            'transactionDateTime' => $res_transactionDateTime,
+//            'maskedPan' => $res_maskedPan,
+//            'eci' => $res_eci,
+//            'paymentScheme' => $res_paymentScheme,
+//            'processBy' => $res_processBy,
+//            'userDefined1' => $res_userDefined1,
+//            'userDefined2' => $res_userDefined2,
+//            'userDefined3' => $res_userDefined3,
+//            'userDefined4' => $res_userDefined4,
+//            'userDefined5' => $res_userDefined5,
+//
+//        ];
+        return $answer;
+    }
+
+    /**
      * @param $paymentProcessor
      * @return string
      */
@@ -545,9 +724,12 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $processor_id = $this->_paymentProcessor['id']; //Get processor_name from 2C2P PGW Dashboard
         $params['cid'] = $contact_id;
         $params['destination'] = 'front';
+
         $frontendReturnUrl = self::getReturnUrl($processor_id, $processor_name, $params, $component);
+        CRM_Core_Error::debug_var('frontendReturnUrl', $frontendReturnUrl);
         $params['destination'] = 'back';
         $backendReturnUrl = self::getReturnUrl($processor_id, $processor_name, $params, $component);
+        CRM_Core_Error::debug_var('backendReturnUrl', $backendReturnUrl);
         if (CRM_Utils_Array::value('is_recur', $params) == TRUE) {
 //
 //            if (CRM_Utils_Array::value('frequency_unit', $params) == 'day') {
@@ -560,7 +742,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             $allowAccumulate = true;
             $maxAccumulateAmount = 1;
             $recurringInterval = intval(CRM_Utils_Array::value('frequency_interval', $params, 0));
-            $date = date('Y-m-d');
+            $date = date('Y-m-d H:i:s');
             $chargeNextDate = date('dmY', strtotime($date . ' +1 day'));
             $recurringCount = 1;
 //            throw new CRM_Core_Exception(ts('2c2p - recurring payments not implemented'));
@@ -652,7 +834,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     public
     function handlePaymentNotification()
     {
-//        $params = array_merge($_GET, $_REQUEST);
+        $params = array_merge($_GET, $_REQUEST);
 //        $q = explode('/', CRM_Utils_Array::value('q', $params, ''));
 //        $lastParam = array_pop($q);
 //        if (is_numeric($lastParam)) {
@@ -663,8 +845,13 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //            'id' => $params['processor_id'],
 //            'api.PaymentProcessorType.getvalue' => ['return' => "name"],
 //        ]);
-//        CRM_Core_Error::debug_var('paymentProcessor', $this->_paymentProcessor);
-
+        $params = array_merge($_GET, $_REQUEST);
+        CRM_Core_Error::debug_var('getbackparams', $params);
+        $destination = $params['destination'];
+//        if($destination == "front"){
+//
+//        }
+        CRM_Core_Error::debug_var('destination', $destination);
         $encodedPaymentResponse = $_REQUEST['paymentResponse'];
         $paymentResponse = $this->decodePayload64($encodedPaymentResponse);
 ////        CRM_Core_Error::debug_var('paymentResponse', $paymentResponse);
@@ -799,7 +986,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                 '&pid=' . $params['participantID'] .
                 "&eid=" . $params['eventID'] .
                 "&inId=" . $params['invoiceID'] .
-                '&orderId=' . $params['orderID'].
+                '&orderId=' . $params['orderID'] .
                 '&destination=' . $params['destination'];
 
         }
@@ -923,6 +1110,11 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                     CRM_Core_PseudoConstant::getKey(
                         'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'In Progress');
             }
+            if ($resp_code == "4120") {
+                $contribution_status_id =
+                    CRM_Core_PseudoConstant::getKey(
+                        'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Refunded');
+            }
             $query = "UPDATE civicrm_contribution SET 
                                 contribution_status_id=$contribution_status_id 
                       where invoice_id='$invoiceId'";
@@ -930,6 +1122,11 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //            CRM_Core_Error::statusBounce(ts($_POST['respDesc']) . ts('2c2p Error:') . 'error', $url, 'error');
             CRM_Utils_System::redirect($failureUrl);
             return;
+        } else {
+            $query = "UPDATE civicrm_contribution SET 
+                                contribution_status_id=1 
+                      where invoice_id='$invoiceId'";
+            CRM_Core_DAO::executeQuery($query);
         }
         $cardNo = substr($decodedTokenResponse['cardNo'], -4);
         $cardType = $decodedTokenResponse['cardType'];
@@ -1083,6 +1280,154 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             CRM_Core_Error::statusBounce("No Invoice ID", null, '2c2p');
 
         }
+    }
+
+    /**
+     * @param $response
+     * @param $path_to_2c2p_certificate
+     * @param $path_to_merchant_pem
+     * @param $merchant_password
+     * @param $merchant_secret
+     * @throws CRM_Core_Exception
+     */
+
+    public static function getPaymentFrom2c2pResponse($response,
+                                                      $path_to_2c2p_certificate,
+                                                      $path_to_merchant_pem,
+                                                      $merchant_password,
+                                                      $merchant_secret): array
+    {
+        //credentials part
+        $receiverPublicCertPath = $path_to_2c2p_certificate;
+        $receiverPublicCertKey = \Jose\Component\KeyManagement\JWKFactory::createFromCertificateFile(
+            $receiverPublicCertPath, // The filename
+        );
+
+        $senderPrivateKeyPath = $path_to_merchant_pem;
+
+        $senderPrivateKeyPassword = $merchant_password;
+        $jw_signature_key = \Jose\Component\KeyManagement\JWKFactory::createFromKeyFile(
+            $senderPrivateKeyPath,
+            $senderPrivateKeyPassword
+        );
+
+        $secretKey = $merchant_secret;    //Get SecretKey from 2C2P PGW Dashboard
+//end credentials part
+
+        $response_body = $response->getBody()->getContents();
+
+        $signatureAlgorithmManager = new \Jose\Component\Core\AlgorithmManager([
+            new \Jose\Component\Signature\Algorithm\PS256(),
+        ]);
+
+
+        // We instantiate our JWS Verifier.
+        $jwsVerifier = new \Jose\Component\Signature\JWSVerifier(
+            $signatureAlgorithmManager
+        );
+
+        $signature_serializer = new \Jose\Component\Signature\Serializer\CompactSerializer(); // The serializer
+
+        $signatureSerializerManager = new \Jose\Component\Signature\Serializer\JWSSerializerManager([
+            $signature_serializer,
+        ]);
+
+        $headerSignatureCheckerManager = new \Jose\Component\Checker\HeaderCheckerManager(
+            [
+                new \Jose\Component\Checker\AlgorithmChecker(['PS256']),
+            ],
+            [
+                new \Jose\Component\Signature\JWSTokenSupport(), // Adds JWS token type support
+            ]
+        );
+
+        try {
+            $jw_signed_response = $signature_serializer->unserialize($response_body);
+            $isVerified = $jwsVerifier->verifyWithKey($jw_signed_response, $receiverPublicCertKey, 0);
+            if ($isVerified) {
+
+                $jwsLoader = new \Jose\Component\Signature\JWSLoader(
+                    $signatureSerializerManager,
+                    $jwsVerifier,
+                    $headerSignatureCheckerManager
+                );
+
+                $jwsigned_response_loaded = $jwsLoader->loadAndVerifyWithKey((string)$response_body, $receiverPublicCertKey, $signature, null);
+                $encrypted_serialized_response = $jwsigned_response_loaded->getPayload();
+            } else {
+                throw new CRM_Core_Exception(ts("2c2p Error: Not Verified "));
+            }
+
+        } catch (Exception $e) {
+            $em = $e->getMessage();
+            throw new CRM_Core_Exception(ts("2c2p Error: $em "));
+        }
+
+
+        $encryption_serializer = new \Jose\Component\Encryption\Serializer\CompactSerializer(); // The serializer
+
+        try {
+
+            $encryptionSerializerManager = new \Jose\Component\Encryption\Serializer\JWESerializerManager([
+                $encryption_serializer,
+            ]);
+
+            $jw_encrypted_response = $encryption_serializer->unserialize($encrypted_serialized_response);
+
+            // The key encryption algorithm manager with the A256KW algorithm.
+            $keyEncryptionAlgorithmManager = new \Jose\Component\Core\AlgorithmManager([
+                new \Jose\Component\Encryption\Algorithm\KeyEncryption\RSAOAEP(),
+            ]);
+
+// The content encryption algorithm manager with the A256CBC-HS256 algorithm.
+            $contentEncryptionAlgorithmManager = new \Jose\Component\Core\AlgorithmManager([
+                new \Jose\Component\Encryption\Algorithm\ContentEncryption\A256GCM(),
+            ]);
+
+// The compression method manager with the DEF (Deflate) method.
+            $compressionMethodManager = new \Jose\Component\Encryption\Compression\CompressionMethodManager([
+                new \Jose\Component\Encryption\Compression\Deflate(),
+            ]);
+
+// We instantiate our JWE Decrypter.
+            $jweDecrypter = new \Jose\Component\Encryption\JWEDecrypter(
+                $keyEncryptionAlgorithmManager,
+                $contentEncryptionAlgorithmManager,
+                $compressionMethodManager
+            );
+            $headerCheckerManagerE = new \Jose\Component\Checker\HeaderCheckerManager(
+                [
+                    new \Jose\Component\Checker\AlgorithmChecker(['RSA-OAEP']),
+                ],
+                [
+                    new \Jose\Component\Encryption\JWETokenSupport(), // Adds JWS token type support
+                ]
+            );
+
+            $success = $jweDecrypter->decryptUsingKey($jw_encrypted_response, $jw_signature_key, 0);
+//        echo $success;
+            $jweLoader = new \Jose\Component\Encryption\JWELoader(
+                $encryptionSerializerManager,
+                $jweDecrypter,
+                $headerCheckerManagerE
+            );
+            $jw_encrypted_response = $jweLoader->loadAndDecryptWithKey($encrypted_serialized_response,
+                $jw_signature_key,
+                $recipient);
+            $unencrypted_payload = $jw_encrypted_response->getPayload();
+
+
+        } catch (Exception $e) {
+            throw new CRM_Core_Exception(ts('2c2p - JWE Error'));
+        }
+        echo $unencrypted_payload;
+//        if($request_type == "RecurringMaintenanceRequest"){
+//        $answer = self::unencryptRecurringPaymentAnswer($unencrypted_payload, $secretKey);
+//        }
+//        if($request_type == "PaymentProcessRequest"){
+        $answer = self::unencryptPaymentAnswer($unencrypted_payload, $secretKey);
+//        }
+        return $answer;
     }
 }
 

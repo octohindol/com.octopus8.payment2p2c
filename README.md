@@ -86,3 +86,12 @@ You should enter your "Merchant ID", "Secret", "Gateway URL", "Thank You Page UR
 
 - 0.1.18 beta - NRIC is freezed for users with NRIC. To pay for somebody else user should use link.
 
+- 0.1.19 beta - Response to the server is loaded via backend URL, so that system does not wait for user to go back to the site.
+
+if you use ngrock to test your CiviCRM, you may need to put this to the civicrm.settings.php as well 
+```
+define( 'CIVICRM_UF_BASEURL'      , 'https://########.ngrok.io');
+```
+
+- 0.1.20 beta - added proc to unsign-unencrypt response from 2c2p server
+    developing proc to send signed-encrypted request to 2c2p server
