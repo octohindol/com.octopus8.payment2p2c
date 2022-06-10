@@ -544,7 +544,10 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $processor_name = $this->_paymentProcessor['name']; //Get processor_name from 2C2P PGW Dashboard
         $processor_id = $this->_paymentProcessor['id']; //Get processor_name from 2C2P PGW Dashboard
         $params['cid'] = $contact_id;
+        $params['destination'] = 'front';
         $frontendReturnUrl = self::getReturnUrl($processor_id, $processor_name, $params, $component);
+        $params['destination'] = 'back';
+        $backendReturnUrl = self::getReturnUrl($processor_id, $processor_name, $params, $component);
         if (CRM_Utils_Array::value('is_recur', $params) == TRUE) {
 //
 //            if (CRM_Utils_Array::value('frequency_unit', $params) == 'day') {
@@ -572,6 +575,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             "currencyCode" => $currency,
             "request3DS" => "F",
             "frontendReturnUrl" => $frontendReturnUrl,
+            "backendReturnUrl" => $backendReturnUrl,
             "uiParams" => [
                 "userInfo" => [
                     "email" => "",
@@ -771,31 +775,35 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 
     }
 
-    public
+    static
     function getReturnUrl($processor_id, $processor_name, $params, $component = 'contribute')
     {
+        $returnUrl = "";
         if (!isset($params['orderID'])) {
             $params['orderID'] = substr($params['invoiceID'], 0, CRM_Core_Payment_Payment2c2p::LENTRXNID);
         }
         if ($component == 'contribute') {
-            $this->data['returnUrl'] = CRM_Utils_System::baseCMSURL() .
+            $returnUrl = CRM_Utils_System::baseCMSURL() .
                 "civicrm/payment/ipn?processor_id=$processor_id&processor_name=$processor_name&md=contribute&qfKey=" .
                 $params['qfKey'] .
                 '&inId=' . $params['invoiceID'] .
                 '&orderId=' . $params['orderID'] .
-                '&cid=' . $params['cid'];
-            return $this->data['returnUrl'];
+                '&cid=' . $params['cid'] .
+                '&destination=' . $params['destination'];
+
+
         } else if ($component == 'event') {
-            $this->data['returnUrl'] = CRM_Utils_System::baseCMSURL() .
+            $returnUrl = CRM_Utils_System::baseCMSURL() .
                 "civicrm/payment/ipn?processor_id=$processor_id&processor_name=$processor_name&md=event&qfKey=" .
                 $params['qfKey'] .
                 '&pid=' . $params['participantID'] .
                 "&eid=" . $params['eventID'] .
                 "&inId=" . $params['invoiceID'] .
-                '&orderId=' . $params['orderID'];
-            return $this->data['returnUrl'];
+                '&orderId=' . $params['orderID'].
+                '&destination=' . $params['destination'];
+
         }
-        return $this->data['returnUrl'];
+        return $returnUrl;
     }
 
     /**
