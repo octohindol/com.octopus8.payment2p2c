@@ -445,6 +445,84 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     }
 
     /**
+     * @param $invoiceId
+     * @return mixed
+     * @throws CRM_Core_Exception
+     */
+    protected static function getPaymentProcessorIdViaInvoiceID($invoiceId)
+    {
+        $payment_token = self::getPaymentTokenViaInvoiceID($invoiceId);
+        $paymentProcessorId = $payment_token['payment_processor_id'];
+        return $paymentProcessorId;
+    }
+
+    /**
+     * @param $invoiceID
+     * @param $paymentProcessorId
+     * @return CRM_Financial_DAO_PaymentProcessor
+     * @throws CRM_Core_Exception
+     */
+    protected static function getPaymentProcessorViaProcessorID($paymentProcessorId): CRM_Financial_DAO_PaymentProcessor
+    {
+        try {
+            $paymentProcessor = new CRM_Financial_DAO_PaymentProcessor();
+            $paymentProcessor->id = $paymentProcessorId;
+            $paymentProcessor->find(TRUE);
+        } catch (CiviCRM_API3_Exception $e) {
+            CRM_Core_Error::debug_var('API error', $e->getMessage());
+            throw new CRM_Core_Exception(ts('2c2p - Could not find payment processor'));
+        }
+        return $paymentProcessor;
+    }
+
+    /**
+     * @param $invoiceID
+     * @return array|int
+     * @throws CRM_Core_Exception
+     */
+    protected static function getPaymentTokenViaInvoiceID($invoiceID)
+    {
+        try {
+            $payment_token = civicrm_api3('PaymentToken', 'getsingle', [
+                'masked_account_number' => $invoiceID,
+            ]);
+        } catch (CiviCRM_API3_Exception $e) {
+            CRM_Core_Error::debug_var('API error', $e->getMessage());
+            $query = "UPDATE civicrm_contribution SET contribution_status_id=4 where invoice_id='$invoiceID'";
+            CRM_Core_DAO::executeQuery($query);
+            throw new CRM_Core_Exception(ts('2c2p - Could not find payment token'));
+        }
+        return $payment_token;
+    }
+
+    /**
+     * @param $invoiceID
+     * @param $paymentProcessorId
+     * @param $paymentToken
+     * @return array
+     * @throws CRM_Core_Exception
+     */
+    protected static function getPaymentInquiryViaPaymentToken($invoiceID): array
+    {
+        $payment_token = self::getPaymentTokenViaInvoiceID($invoiceID);
+        $paymentToken = $payment_token['token'];
+        $paymentProcessorId = $payment_token['payment_processor_id'];
+        $paymentProcessor = self::getPaymentProcessorViaProcessorID($paymentProcessorId);
+        $url = $paymentProcessor->url_site . '/payment/4.1/paymentInquiry';
+        $secretkey = $paymentProcessor->password;
+        $merchantID = $paymentProcessor->user_name;
+        $payload = array(
+            "paymentToken" => $paymentToken,
+            "merchantID" => $merchantID,
+            "invoiceNo" => $invoiceID,
+            "locale" => "en");
+        $inquiryRequestData = self::encodeJwtData($secretkey, $payload);
+        $encodedTokenResponse = self::getEncodedResponse($url, $inquiryRequestData);
+        $decodedTokenResponse = self::getDecodedResponse($secretkey, $encodedTokenResponse);
+        return $decodedTokenResponse;
+    }
+
+    /**
      * @param $paymentProcessor
      * @return string
      */
@@ -472,6 +550,44 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //            CRM_Core_Error::debug_var('thanxUrl1', $thanxUrl);
         }
         return $thanxUrl;
+    }
+
+    /**
+     * @param $paymentProcessor
+     * @return string
+     * @throws CRM_Core_Exception
+     */
+    private static function getThanxUrlViaInvoiceID($invoiceID): string
+    {
+        $payment_token = self::getPaymentTokenViaInvoiceID($invoiceID);
+        $paymentProcessorId = $payment_token['payment_processor_id'];
+        $paymentProcessor = self::getPaymentProcessorViaProcessorID($paymentProcessorId);
+        $paymentProcessor = (array)$paymentProcessor;
+        $thanxUrl = strval($paymentProcessor['subject']);
+        if ($thanxUrl == null || $thanxUrl == "") {
+            $thanxUrl = CRM_Utils_System::url();
+//            CRM_Core_Error::debug_var('thanxUrl1', $thanxUrl);
+        }
+        return $thanxUrl;
+    }
+
+    /**
+     * @param $paymentProcessor
+     * @return string
+     * @throws CRM_Core_Exception
+     */
+    private static function getFailureUrlViaInvoiceID($invoiceID): string
+    {
+        $payment_token = self::getPaymentTokenViaInvoiceID($invoiceID);
+        $paymentProcessorId = $payment_token['payment_processor_id'];
+        $paymentProcessor = self::getPaymentProcessorViaProcessorID($paymentProcessorId);
+        $paymentProcessor = (array)$paymentProcessor;
+        $failureUrl = strval($paymentProcessor['signature']);
+        if ($failureUrl == null || $failureUrl == "") {
+            $failureUrl = CRM_Utils_System::url();
+//            CRM_Core_Error::debug_var('thanxUrl1', $thanxUrl);
+        }
+        return $failureUrl;
     }
 
 
@@ -619,10 +735,10 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     function doPayment(&$params, $component = 'contribute')
     {
         $this->_component = $component;
-        CRM_Core_Error::debug_var('params_before', $params);
+//        CRM_Core_Error::debug_var('params_before', $params);
 
         $propertyBag = \Civi\Payment\PropertyBag::cast($params);
-        CRM_Core_Error::debug_var('propertyBag', $propertyBag);
+//        CRM_Core_Error::debug_var('propertyBag', $propertyBag);
         if ($propertyBag->getAmount() == 0) {
             $statuses = CRM_Contribute_BAO_Contribution::buildOptions('contribution_status_id', 'validate');
             $result['payment_status_id'] = array_search('Completed', $statuses);
@@ -661,26 +777,17 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         }
 
         if (array_key_exists("nric", $params)) {
-            //@todo check if new user is created by profile
             $nric = $params['nric'];
-//            CRM_Core_Error::debug_var('nric', $nric);
             try {
                 $contactNRIC = civicrm_api3('Contact', 'getsingle', [
                     'return' => [
                         "id"],
                     'external_identifier' => $nric
                 ]);
-//                CRM_Core_Error::debug_var('contact0', $contactNRIC);
+
                 if ($contactNRIC['is_error']) {
                     CRM_Core_Error::debug_var('error', 'no such NRIC');
-//                    $contactNRIC = civicrm_api3('Contact', 'create', [
-//                        'contact_type' => "Individual",
-//                        'external_identifier' => $nric,
-//                        'display_name' => 'NRIC ' . $nric,
-//                    ]);
-//
-//                    $contact_id = $contactNRIC['id'];
-//                    $params['contactID'] = $contact_id;
+
                 } else {
                     $contact_id = $contactNRIC['id'];
                     $params['contactID'] = $contact_id;
@@ -691,18 +798,9 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                     $contact->update();
                 } else {
                     CRM_Core_Error::debug_var('error', 'absent NRIC');
-//                    $contact = civicrm_api3('Contact', 'create', [
-//                        'contact_type' => "Individual",
-//                        'external_identifier' => $nric,
-//                        'display_name' => 'NRIC ' . $nric,
-//                    ]);
-//                    $contact_id = $contact['id'];
-//                    $params['contactID'] = $contact_id;
                 }
-//                CRM_Core_Error::debug_var('contact_after_error', $contact);
-//                CRM_Core_Error::debug_var('eeee', $e->getErrorCode());
             }
-//            CRM_Core_Error::debug_var('params_after', $params);
+
 
             $query = "UPDATE civicrm_contribution SET contact_id = $contact_id where invoice_id='$invoiceNo'";
             CRM_Core_DAO::executeQuery($query);
@@ -724,7 +822,6 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $processor_id = $this->_paymentProcessor['id']; //Get processor_name from 2C2P PGW Dashboard
         $params['cid'] = $contact_id;
         $params['destination'] = 'front';
-
         $frontendReturnUrl = self::getReturnUrl($processor_id, $processor_name, $params, $component);
         CRM_Core_Error::debug_var('frontendReturnUrl', $frontendReturnUrl);
         $params['destination'] = 'back';
@@ -852,7 +949,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //
 //        }
         CRM_Core_Error::debug_var('destination', $destination);
-        if($destination == "back"){
+        if ($destination == "back") {
             $invoiceId = CRM_Utils_Array::value('inId', $_GET);
             self::setContributionStatusRecieved($invoiceId);
         }
@@ -1024,6 +1121,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      * @param $invoiceId
      * @param $thanxUrl
      * @param $failureUrl
+     * @throws CRM_Core_Exception
      */
     public static function setContributionStatusRecieved($invoiceId): void
     {
@@ -1040,55 +1138,14 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $contribution = civicrm_api3('Contribution', 'get', $contributionParams)['values'];
         $contribution = reset($contribution);
 //        CRM_Core_Error::debug_var('contribution', $contribution);
-        $paymentToken = "";
-        try {
-            $payment_token = civicrm_api3('PaymentToken', 'getsingle', [
-                'masked_account_number' => $invoiceId,
-            ]);
-            $paymentToken = $payment_token['token'];
-            $paymentProcessorId = $payment_token['payment_processor_id'];
-        } catch (CiviCRM_API3_Exception $e) {
-            CRM_Core_Error::debug_var('API error', $e->getMessage());
-            $query = "UPDATE civicrm_contribution SET contribution_status_id=4 where invoice_id='$invoiceId'";
-            CRM_Core_DAO::executeQuery($query);
-            throw new CRM_Core_Exception(ts('2c2p - Could not find payment token'));
-        }
-        $paymentProcessor = new CRM_Financial_DAO_PaymentProcessor();
-        $paymentProcessor->id = $paymentProcessorId;
-        $paymentProcessor->find(TRUE);
-//        CRM_Core_Error::debug_var('paymentProcessor', $paymentProcessor);
-        $thanxUrl = self::getThanxUrl($paymentProcessor);
-        $failureUrl = self::getFailureUrl($paymentProcessor);
-//        CRM_Core_Error::debug_var('thanxUrl', $thanxUrl);
-//        CRM_Core_Error::debug_var('failureUrl', $failureUrl);
-//        CRM_Core_Error::debug_var('paymentToken', $paymentToken);
-        $url = $paymentProcessor->url_site . '/payment/4.1/paymentInquiry';    //Get url_site from 2C2P PGW Dashboard
-//        CRM_Core_Error::debug_var('url', $url);
-        $secretkey = $paymentProcessor->password;
-        $merchantID = $paymentProcessor->user_name;
-        $payload = array(
-            "paymentToken" => $paymentToken,
-            "merchantID" => $merchantID,
-            "invoiceNo" => $invoiceId,
-            "locale" => "en");
-//        CRM_Core_Error::debug_var('payload', $payload);
-        $inquiryRequestData = self::encodeJwtData($secretkey, $payload);
-//        CRM_Core_Error::debug_var('inquiryRequestData', $inquiryRequestData);
-        $encodedTokenResponse = self::getEncodedResponse($url, $inquiryRequestData);
-//        CRM_Core_Error::debug_var('encodedTokenResponse', $encodedTokenResponse);
-        $decodedTokenResponse = self::getDecodedResponse($secretkey, $encodedTokenResponse);
+        $decodedTokenResponse = self::getPaymentInquiryViaPaymentToken($invoiceId);
         CRM_Core_Error::debug_var('decodedTokenResponse', $decodedTokenResponse);
 //        CRM_Core_Error::debug_var('url', $url);
         $resp_code = $decodedTokenResponse['respCode'];
-//        CRM_Core_Error::debug_var('resp_code', $resp_code);
-        /*
-         *     [recurringUniqueID] => 170959
-            [tranRef] => 4990727
-            [referenceNo] => 4606096
-         */
         $tranRef = $decodedTokenResponse['tranRef'];
         $recurringUniqueID = $decodedTokenResponse['recurringUniqueID'];
         $referenceNo = $decodedTokenResponse['referenceNo'];
+
         $query = "UPDATE civicrm_payment_token SET 
                                 billing_first_name='$recurringUniqueID',
                                  billing_middle_name='$tranRef',
@@ -1123,14 +1180,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                                 contribution_status_id=$contribution_status_id 
                       where invoice_id='$invoiceId'";
             CRM_Core_DAO::executeQuery($query);
-//            CRM_Core_Error::statusBounce(ts($_POST['respDesc']) . ts('2c2p Error:') . 'error', $url, 'error');
-            CRM_Utils_System::redirect($failureUrl);
             return;
-        } else {
-            $query = "UPDATE civicrm_contribution SET 
-                                contribution_status_id=1 
-                      where invoice_id='$invoiceId'";
-            CRM_Core_DAO::executeQuery($query);
         }
         $cardNo = substr($decodedTokenResponse['cardNo'], -4);
         $cardType = $decodedTokenResponse['cardType'];
@@ -1148,7 +1198,9 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 
 
         $contributionId = $contribution['id'];
-
+        $paymentProcessorId = self::getPaymentProcessorIdViaInvoiceID($invoiceId);
+        $thanxUrl = self::getThanxUrlViaInvoiceID($invoiceId);
+        $failureUrl = self::getFailureUrlViaInvoiceID($invoiceId);
         try {
             civicrm_api3('contribution', 'completetransaction',
                 ['id' => $contributionId,
@@ -1161,7 +1213,6 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             if (!stristr($e->getMessage(), 'Contribution already completed')) {
                 Civi::log()->debug("2c2p IPN Error Updating contribution: " . $e->getMessage());
                 CRM_Utils_System::redirect($failureUrl);
-
             }
         }
         CRM_Utils_System::redirect($thanxUrl);
@@ -1172,28 +1223,12 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     /**
      * @param $invoiceId
      * @param string $url
+     * @throws CRM_Core_Exception
      */
     public static
     function setContributionStatusRejected($invoiceId): void
     {
-        try {
-            $payment_token = civicrm_api3('PaymentToken', 'getsingle', [
-                'masked_account_number' => $invoiceId,
-            ]);
-            $paymentToken = $payment_token['token'];
-            $paymentProcessorId = $payment_token['payment_processor_id'];
-        } catch (CiviCRM_API3_Exception $e) {
-            CRM_Core_Error::debug_var('API error', $e->getMessage());
-            $query = "UPDATE civicrm_contribution SET contribution_status_id=4 where invoice_id='$invoiceId'";
-            CRM_Core_DAO::executeQuery($query);
-            throw new CRM_Core_Exception(ts('2c2p - Could not find payment token'));
-        }
-        $paymentProcessor = new CRM_Financial_DAO_PaymentProcessor();
-        $paymentProcessor->id = $paymentProcessorId;
-        $paymentProcessor->find(TRUE);
-//        CRM_Core_Error::debug_var('paymentProcessor', $paymentProcessor);
-        $failureUrl = self::getFailureUrl($paymentProcessor);
-
+        $failureUrl = self::getFailureUrlViaInvoiceID($invoiceId);
         $query = "UPDATE civicrm_contribution SET check_number='' where invoice_id='$invoiceId'";
         CRM_Core_DAO::executeQuery($query);
         $query = "UPDATE civicrm_contribution SET contribution_status_id=4 where invoice_id='$invoiceId'";

@@ -157,8 +157,8 @@ function payment2c2p_civicrm_buildForm($formName, &$form)
             // just to use 'contribution'.
             $values = (array)$contribution;
             $invoiceId = $values['invoice_id'];
-            $contributionStatus = CRM_Core_PseudoConstant::getName('CRM_Contribute_BAO_Contribution', 'contribution_status_id', $values['contribution_status_id']);
-            if ($contributionStatus == 'Pending') {
+//            $contributionStatus = CRM_Core_PseudoConstant::getName('CRM_Contribute_BAO_Contribution', 'contribution_status_id', $values['contribution_status_id']);
+//            if ($contributionStatus == 'Pending') {
 //                CRM_Core_Error::debug_var('values', $values);
 //                CRM_Core_Error::debug_var('contributionStatus', $contributionStatus);
                 if (isset($form->get_template_vars()['linkButtons'])) {
@@ -179,7 +179,7 @@ function payment2c2p_civicrm_buildForm($formName, &$form)
                 }
             }
         }
-    }
+//    }
 }
 
 
