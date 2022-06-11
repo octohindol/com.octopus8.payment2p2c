@@ -9,6 +9,20 @@
    +---------------------------------------------------------------------------+
   */
 
+use CRM_Payment2c2p_ExtensionUtil as E;
+
+$autoload = __DIR__ . '/vendor/autoload.php';
+if (file_exists($autoload)) {
+    CRM_Core_Error::debug_var('autoload1', $autoload);
+    require_once $autoload;
+} else {
+    $autoload = E::path() . '/vendor/autoload.php';
+    if (file_exists($autoload)) {
+        require_once $autoload;
+        CRM_Core_Error::debug_var('autoload2', $autoload);
+    }
+}
+
 use Civi\Payment\Exception\PaymentProcessorException;
 use \Firebase\JWT\JWT;
 
@@ -26,6 +40,11 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      * @var GuzzleHttp\Client
      */
     protected $guzzleClient;
+
+    private const OPEN_CERTIFICATE_FILE_NAME = "sandbox-jwt-2c2p.demo.2.1(public).cer";
+    private const CLOSED_CERTIFICATE_FILE_NAME = "private.pem";
+    private const CLOSED_CERTIFICATE_PWD = "octopus8";
+
 
     const PAYMENT_RESPONCE = array(
         "0000" => "Successful",
@@ -266,6 +285,235 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     }
 
     /**
+     * @param string|null $unencrypted_payload
+     * @param $secretKey
+     * @return array
+     * @throws CRM_Core_Exception
+     */
+    protected static function unencryptRecurringPaymentAnswer(?string $unencrypted_payload, $secretKey): array
+    {
+        $resXml = simplexml_load_string($unencrypted_payload);
+        $array = json_decode(json_encode((array)simplexml_load_string($resXml)), $resXml);
+//        print_r($array);
+        $res_version = (string)$resXml->version;
+        $res_timeStamp = (string)$resXml->timeStamp;
+        $res_respCode = (string)$resXml->respCode;
+        $res_respReason = (string)$resXml->respReason;
+        $res_recurringUniqueID = (string)$resXml->recurringUniqueID;
+        $res_recurringStatus = (string)$resXml->recurringStatus;
+        $res_invoicePrefix = (string)$resXml->invoicePrefix;
+        $res_currency = (int)$resXml->currency;
+        $res_amount = (int)$resXml->amount;
+        $res_maskedCardNo = (string)$resXml->maskedCardNo;
+        $res_allowAccumulate = (boolean)$resXml->allowAccumulate;
+        $res_maxAccumulateAmount = (int)$resXml->maxAccumulateAmount;
+        $res_recurringInterval = (int)$resXml->recurringInterval;
+        $res_recurringCount = (int)$resXml->recurringCount;
+        $res_currentCount = (int)$resXml->currentCount;
+        $res_chargeNextDate = (string)$resXml->chargeNextDate;
+
+
+//Compute response hash
+        $res_stringToHash =
+            $res_version
+            . $res_respCode
+            . $res_recurringUniqueID
+            . $res_recurringStatus
+            . $res_invoicePrefix
+            . $res_currency
+            . $res_amount
+            . $res_maskedCardNo
+            . $res_allowAccumulate
+            . $res_maxAccumulateAmount
+            . $res_recurringInterval
+            . $res_recurringCount
+            . $res_currentCount
+            . $res_chargeNextDate;
+
+        $res_responseHash = strtoupper(hash_hmac('sha1', $res_stringToHash, $secretKey, false));    //Compute hash value
+
+        if (strtolower($resXml->hashValue) != strtolower($res_responseHash)) {
+            throw new CRM_Core_Exception(ts('2c2p - Unvalid Response Hash'));
+        }
+
+        $answer = [
+            'version' => $res_version,
+            'timeStamp' => $res_timeStamp,
+            'respCode' => $res_respCode,
+            'respReason' => $res_respReason,
+            'recurringUniqueID' => $res_recurringUniqueID,
+            'recurringStatus' => $res_recurringStatus,
+            'invoicePrefix' => $res_invoicePrefix,
+            'currency' => $res_currency,
+            'amount' => $res_amount,
+            'maskedCardNo' => $res_maskedCardNo,
+            'allowAccumulate' => $res_allowAccumulate,
+            'maxAccumulateAmount' => $res_maxAccumulateAmount,
+            'recurringInterval' => $res_recurringInterval,
+            'recurringCount' => $res_recurringCount,
+            'currentCount' => $res_currentCount,
+            'chargeNextDate' => $res_chargeNextDate,
+        ];
+        return $answer;
+    }
+
+    /**
+     * @param string|null $unencrypted_payload
+     * @param $secretKey
+     * @return array
+     * @throws CRM_Core_Exception
+     */
+    protected static function unencryptPaymentAnswer(?string $unencrypted_payload, $secretKey): array
+    {
+
+        $answer = json_decode(json_encode((array)simplexml_load_string($unencrypted_payload)), $unencrypted_payload);
+        $answer = array_map(function ($o) {
+            if (is_array($o)) {
+                if (sizeof($o) == 0) {
+                    return "";
+                } else {
+                    return array_map("strval", $o);
+                }
+            }
+            return (string)$o;
+        }, $answer);
+        return $answer;
+    }
+
+    /**
+     * @param $invoiceId
+     * @return mixed
+     * @throws CRM_Core_Exception
+     */
+    protected static function getPaymentProcessorIdViaInvoiceID($invoiceId)
+    {
+        $payment_token = self::getPaymentTokenViaInvoiceID($invoiceId);
+        $paymentProcessorId = $payment_token['payment_processor_id'];
+        return $paymentProcessorId;
+    }
+
+    /**
+     * @param $invoiceID
+     * @param $paymentProcessorId
+     * @return CRM_Financial_DAO_PaymentProcessor
+     * @throws CRM_Core_Exception
+     */
+    protected static function getPaymentProcessorViaProcessorID($paymentProcessorId): CRM_Core_Payment_Payment2c2p
+    {
+//        try {
+//            $paymentProcessor = new CRM_Financial_DAO_PaymentProcessor();
+//            $paymentProcessor->id = $paymentProcessorId;
+//            $paymentProcessor->find(TRUE);
+//        } catch (CiviCRM_API3_Exception $e) {
+//            CRM_Core_Error::debug_var('API error', $e->getMessage());
+//            throw new CRM_Core_Exception(ts('2c2p - Could not find payment processor'));
+//        }
+//        return (CRM_Core_Payment_Payment2c2p) $paymentProcessor;
+        $paymentProcessorInfo = civicrm_api3('PaymentProcessor', 'get', [
+            'id' => $paymentProcessorId,
+            'sequential' => 1,
+        ]);
+        $paymentProcessorInfo = $paymentProcessorInfo['values'];
+        if (count($paymentProcessorInfo) <= 0) {
+            return NULL;
+        }
+        $paymentProcessorInfo = $paymentProcessorInfo[0];
+        $paymentProcessor = new CRM_Core_Payment_Payment2c2p(($paymentProcessorInfo['is_test']) ? 'test' : 'live', $paymentProcessorInfo);
+        return $paymentProcessor;
+    }
+
+    /**
+     * @param $invoiceID
+     * @return array|int
+     * @throws CRM_Core_Exception
+     */
+    protected static function getPaymentTokenViaInvoiceID($invoiceID)
+    {
+        try {
+            $payment_token = civicrm_api3('PaymentToken', 'getsingle', [
+                'masked_account_number' => $invoiceID,
+            ]);
+        } catch (CiviCRM_API3_Exception $e) {
+            CRM_Core_Error::debug_var('API error', $e->getMessage() . "\nInvoiceID: $invoiceID\n");
+//            $query = "UPDATE civicrm_contribution SET contribution_status_id=4 where invoice_id='$invoiceID'";
+//            CRM_Core_DAO::executeQuery($query);
+            throw new CRM_Core_Exception(ts('2c2p - Could not find payment token') . "\nInvoiceID: $invoiceID\n");
+        }
+        return $payment_token;
+    }
+
+    /**
+     * @param $invoiceID
+     * @return array
+     * @throws CRM_Core_Exception
+     */
+    protected static function getPaymentInquiryViaPaymentToken($invoiceID): array
+    {
+        $payment_token = self::getPaymentTokenViaInvoiceID($invoiceID);
+        $paymentToken = $payment_token['token'];
+        $paymentProcessorId = $payment_token['payment_processor_id'];
+        $paymentProcessor = self::getPaymentProcessorViaProcessorID($paymentProcessorId);
+        $url = $paymentProcessor->url_site . '/payment/4.1/paymentInquiry';
+        $secretkey = $paymentProcessor->password;
+        $merchantID = $paymentProcessor->user_name;
+        $payload = array(
+            "paymentToken" => $paymentToken,
+            "merchantID" => $merchantID,
+            "invoiceNo" => $invoiceID,
+            "locale" => "en");
+        $inquiryRequestData = self::encodeJwtData($secretkey, $payload);
+        $encodedTokenResponse = self::getEncodedResponse($url, $inquiryRequestData);
+        $decodedTokenResponse = self::getDecodedResponse($secretkey, $encodedTokenResponse);
+        return $decodedTokenResponse;
+    }
+
+    /**
+     * @param $invoiceID
+     * @return array
+     * @throws CRM_Core_Exception
+     */
+    public static function getPaymentInquiryViaKeySignature($invoiceID): array
+    {
+        $paymentProcessorId = self::getPaymentProcessorIdViaInvoiceID($invoiceID);
+        $paymentProcessor = self::getPaymentProcessorViaProcessorID($paymentProcessorId);
+
+        $payment_processor = $paymentProcessor->_paymentProcessor;
+        $merchant_id = $payment_processor['user_name'];
+        $merchant_secret = $payment_processor['password'];
+
+        $date = date('Y-m-d');
+        $time_stamp = date('dmyhis', strtotime($date) . ' +1 day');
+
+        $payment_inquiry = array(
+            'version' => "3.8",
+            'processType' => "I",
+            'invoiceNo' => $invoiceID,
+            'timeStamp' => $time_stamp,
+            'merchantID' => $merchant_id,
+            'actionAmount' => "",
+            'request_type' => "PaymentProcessRequest"
+        );
+//        CRM_Core_Error::debug_var('payment_inquiry', $payment_inquiry);
+
+        $response = self::getPaymentResponseViaKeySignature(
+            $payment_inquiry,
+            );
+//        CRM_Core_Error::debug_var('response', $response);
+
+        $path_to_2c2p_certificate = $paymentProcessor->getOpenCertificatePath();
+        $path_to_merchant_pem = $paymentProcessor->getClosedCertificatePath();
+        $merchant_password = $paymentProcessor->getClosedCertificatePwd();
+        $answer =
+            CRM_Core_Payment_Payment2c2p::getPaymentFrom2c2pResponse($response,
+                $path_to_2c2p_certificate,
+                $path_to_merchant_pem,
+                $merchant_password,
+                $merchant_secret);
+
+        return $answer;
+    }
+
+    /**
      * @param $paymentProcessor
      * @return string
      */
@@ -293,6 +541,44 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //            CRM_Core_Error::debug_var('thanxUrl1', $thanxUrl);
         }
         return $thanxUrl;
+    }
+
+    /**
+     * @param $paymentProcessor
+     * @return string
+     * @throws CRM_Core_Exception
+     */
+    private static function getThanxUrlViaInvoiceID($invoiceID): string
+    {
+        $payment_token = self::getPaymentTokenViaInvoiceID($invoiceID);
+        $paymentProcessorId = $payment_token['payment_processor_id'];
+        $paymentProcessor = self::getPaymentProcessorViaProcessorID($paymentProcessorId);
+        $paymentProcessor = (array)$paymentProcessor;
+        $thanxUrl = strval($paymentProcessor['subject']);
+        if ($thanxUrl == null || $thanxUrl == "") {
+            $thanxUrl = CRM_Utils_System::url();
+//            CRM_Core_Error::debug_var('thanxUrl1', $thanxUrl);
+        }
+        return $thanxUrl;
+    }
+
+    /**
+     * @param $paymentProcessor
+     * @return string
+     * @throws CRM_Core_Exception
+     */
+    private static function getFailureUrlViaInvoiceID($invoiceID): string
+    {
+        $payment_token = self::getPaymentTokenViaInvoiceID($invoiceID);
+        $paymentProcessorId = $payment_token['payment_processor_id'];
+        $paymentProcessor = self::getPaymentProcessorViaProcessorID($paymentProcessorId);
+        $paymentProcessor = (array)$paymentProcessor;
+        $failureUrl = strval($paymentProcessor['signature']);
+        if ($failureUrl == null || $failureUrl == "") {
+            $failureUrl = CRM_Utils_System::url();
+//            CRM_Core_Error::debug_var('thanxUrl1', $thanxUrl);
+        }
+        return $failureUrl;
     }
 
 
@@ -435,15 +721,20 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         return parent::buildForm($form);
     }
 
+    public function doRefund(&$params)
+    {
+        CRM_Core_Error::debug_var('refund_params', $params);
+//        return parent::doRefund($params);
+    }
 
     public
     function doPayment(&$params, $component = 'contribute')
     {
         $this->_component = $component;
-        CRM_Core_Error::debug_var('params_before', $params);
+//        CRM_Core_Error::debug_var('params_before', $params);
 
         $propertyBag = \Civi\Payment\PropertyBag::cast($params);
-        CRM_Core_Error::debug_var('propertyBag', $propertyBag);
+//        CRM_Core_Error::debug_var('propertyBag', $propertyBag);
         if ($propertyBag->getAmount() == 0) {
             $statuses = CRM_Contribute_BAO_Contribution::buildOptions('contribution_status_id', 'validate');
             $result['payment_status_id'] = array_search('Completed', $statuses);
@@ -482,26 +773,17 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         }
 
         if (array_key_exists("nric", $params)) {
-            //@todo check if new user is created by profile
             $nric = $params['nric'];
-//            CRM_Core_Error::debug_var('nric', $nric);
             try {
                 $contactNRIC = civicrm_api3('Contact', 'getsingle', [
                     'return' => [
                         "id"],
                     'external_identifier' => $nric
                 ]);
-//                CRM_Core_Error::debug_var('contact0', $contactNRIC);
+
                 if ($contactNRIC['is_error']) {
                     CRM_Core_Error::debug_var('error', 'no such NRIC');
-//                    $contactNRIC = civicrm_api3('Contact', 'create', [
-//                        'contact_type' => "Individual",
-//                        'external_identifier' => $nric,
-//                        'display_name' => 'NRIC ' . $nric,
-//                    ]);
-//
-//                    $contact_id = $contactNRIC['id'];
-//                    $params['contactID'] = $contact_id;
+
                 } else {
                     $contact_id = $contactNRIC['id'];
                     $params['contactID'] = $contact_id;
@@ -512,18 +794,9 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                     $contact->update();
                 } else {
                     CRM_Core_Error::debug_var('error', 'absent NRIC');
-//                    $contact = civicrm_api3('Contact', 'create', [
-//                        'contact_type' => "Individual",
-//                        'external_identifier' => $nric,
-//                        'display_name' => 'NRIC ' . $nric,
-//                    ]);
-//                    $contact_id = $contact['id'];
-//                    $params['contactID'] = $contact_id;
                 }
-//                CRM_Core_Error::debug_var('contact_after_error', $contact);
-//                CRM_Core_Error::debug_var('eeee', $e->getErrorCode());
             }
-//            CRM_Core_Error::debug_var('params_after', $params);
+
 
             $query = "UPDATE civicrm_contribution SET contact_id = $contact_id where invoice_id='$invoiceNo'";
             CRM_Core_DAO::executeQuery($query);
@@ -546,8 +819,10 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $params['cid'] = $contact_id;
         $params['destination'] = 'front';
         $frontendReturnUrl = self::getReturnUrl($processor_id, $processor_name, $params, $component);
+        CRM_Core_Error::debug_var('frontendReturnUrl', $frontendReturnUrl);
         $params['destination'] = 'back';
         $backendReturnUrl = self::getReturnUrl($processor_id, $processor_name, $params, $component);
+        CRM_Core_Error::debug_var('backendReturnUrl', $backendReturnUrl);
         if (CRM_Utils_Array::value('is_recur', $params) == TRUE) {
 //
 //            if (CRM_Utils_Array::value('frequency_unit', $params) == 'day') {
@@ -560,7 +835,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             $allowAccumulate = true;
             $maxAccumulateAmount = 1;
             $recurringInterval = intval(CRM_Utils_Array::value('frequency_interval', $params, 0));
-            $date = date('Y-m-d');
+            $date = date('Y-m-d H:i:s');
             $chargeNextDate = date('dmY', strtotime($date . ' +1 day'));
             $recurringCount = 1;
 //            throw new CRM_Core_Exception(ts('2c2p - recurring payments not implemented'));
@@ -652,7 +927,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     public
     function handlePaymentNotification()
     {
-//        $params = array_merge($_GET, $_REQUEST);
+        $params = array_merge($_GET, $_REQUEST);
 //        $q = explode('/', CRM_Utils_Array::value('q', $params, ''));
 //        $lastParam = array_pop($q);
 //        if (is_numeric($lastParam)) {
@@ -663,56 +938,65 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //            'id' => $params['processor_id'],
 //            'api.PaymentProcessorType.getvalue' => ['return' => "name"],
 //        ]);
-//        CRM_Core_Error::debug_var('paymentProcessor', $this->_paymentProcessor);
-
-        $encodedPaymentResponse = $_REQUEST['paymentResponse'];
-        $paymentResponse = $this->decodePayload64($encodedPaymentResponse);
+        $params = array_merge($_GET, $_REQUEST);
+        CRM_Core_Error::debug_var('getbackparams', $params);
+        $destination = $params['destination'];
+//        if($destination == "front"){
+//
+//        }
+        CRM_Core_Error::debug_var('destination', $destination);
+        if ($destination == "back") {
+            $invoiceId = CRM_Utils_Array::value('inId', $_GET);
+            self::setRecievedContributionStatus($invoiceId);
+        }
+        if ($destination == "front") {
+            $encodedPaymentResponse = $params['paymentResponse'];
+            $paymentResponse = $this->decodePayload64($encodedPaymentResponse);
 ////        CRM_Core_Error::debug_var('paymentResponse', $paymentResponse);
 
-        require_once 'CRM/Utils/Array.php';
-        $module = CRM_Utils_Array::value('md', $_GET);
-        $invoiceId = CRM_Utils_Array::value('inId', $_GET);
+            require_once 'CRM/Utils/Array.php';
+            $module = CRM_Utils_Array::value('md', $_GET);
+            $invoiceId = CRM_Utils_Array::value('inId', $_GET);
 
-        /** @var TYPE_NAME $this */
-        $paymentProcessor = $this->_paymentProcessor;
-        $thanxUrl = self::getThanxUrl($paymentProcessor);
-        $failureUrl = self::getFailureUrl($paymentProcessor);
+            /** @var TYPE_NAME $this */
+            $paymentProcessor = $this->_paymentProcessor;
+            $thanxUrl = self::getThanxUrl($paymentProcessor);
+            $failureUrl = self::getFailureUrl($paymentProcessor);
 
-        switch ($module) {
-            case 'contribute':
+            switch ($module) {
+                case 'contribute':
 
-                if ($paymentResponse['respCode'] == 2000) {
-                    self::setContributionStatusRecieved($invoiceId);
-                } else {
-                    $this->setContributionStatusRejected($invoiceId, $thanxUrl);
-                }
+                    if ($paymentResponse['respCode'] == 2000) {
+                        self::setRecievedContributionStatus($invoiceId);
+                    } else {
+                        self::setContributionStatusRejected($invoiceId);
+                    }
+                    break;
 
-                break;
-
-            case 'event':
+                case 'event':
 
 
-                if ($paymentResponse['respCode'] == 2000) { // success code
-                    $participantId = CRM_Utils_Array::value('pid', $_GET);
-                    $eventId = CRM_Utils_Array::value('eid', $_GET);
-                    $query = "UPDATE civicrm_participant SET status_id = 1 where id =$participantId AND event_id=$eventId";
-                    CRM_Core_DAO::executeQuery($query);
+                    if ($paymentResponse['respCode'] == 2000) { // success code
+                        $participantId = CRM_Utils_Array::value('pid', $_GET);
+                        $eventId = CRM_Utils_Array::value('eid', $_GET);
+                        $query = "UPDATE civicrm_participant SET status_id = 1 where id =$participantId AND event_id=$eventId";
+                        CRM_Core_DAO::executeQuery($query);
+                        self::setRecievedContributionStatus($invoiceId);
+                    } else { // error code
+                        self::setContributionStatusRejected($invoiceId);
+                    }
 
-                    self::setContributionStatusRecieved($invoiceId);
-                } else { // error code
-                    $this->setContributionStatusRejected($invoiceId, $failureUrl);
-                }
+                    break;
 
-                break;
-
-            default:
-                CRM_Core_Error::statusBounce("Could not get module name from request thanxUrl", $thanxUrl);
-        }
+                default:
+                    CRM_Core_Error::statusBounce("Could not get module name from request thanxUrl", $thanxUrl);
+            }
 
 //        $thanxUrl = CRM_Utils_System::thanxUrl($this->_paymentProcessor['subject']);
 //        CRM_Core_Error::debug_var('thanxUrl4', $thanxUrl);
 
-        return TRUE;
+            return TRUE;
+        }
     }
 
 
@@ -799,7 +1083,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                 '&pid=' . $params['participantID'] .
                 "&eid=" . $params['eventID'] .
                 "&inId=" . $params['invoiceID'] .
-                '&orderId=' . $params['orderID'].
+                '&orderId=' . $params['orderID'] .
                 '&destination=' . $params['destination'];
 
         }
@@ -833,8 +1117,9 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      * @param $invoiceId
      * @param $thanxUrl
      * @param $failureUrl
+     * @throws CRM_Core_Exception
      */
-    public static function setContributionStatusRecieved($invoiceId): void
+    public static function setRecievedContributionStatus($invoiceId): void
     {
 
 
@@ -849,105 +1134,90 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $contribution = civicrm_api3('Contribution', 'get', $contributionParams)['values'];
         $contribution = reset($contribution);
 //        CRM_Core_Error::debug_var('contribution', $contribution);
-        $paymentToken = "";
-        try {
-            $payment_token = civicrm_api3('PaymentToken', 'getsingle', [
-                'masked_account_number' => $invoiceId,
-            ]);
-            $paymentToken = $payment_token['token'];
-            $paymentProcessorId = $payment_token['payment_processor_id'];
-        } catch (CiviCRM_API3_Exception $e) {
-            CRM_Core_Error::debug_var('API error', $e->getMessage());
-            $query = "UPDATE civicrm_contribution SET contribution_status_id=4 where invoice_id='$invoiceId'";
-            CRM_Core_DAO::executeQuery($query);
-            throw new CRM_Core_Exception(ts('2c2p - Could not find payment token'));
-        }
-        $paymentProcessor = new CRM_Financial_DAO_PaymentProcessor();
-        $paymentProcessor->id = $paymentProcessorId;
-        $paymentProcessor->find(TRUE);
-//        CRM_Core_Error::debug_var('paymentProcessor', $paymentProcessor);
-        $thanxUrl = self::getThanxUrl($paymentProcessor);
-        $failureUrl = self::getFailureUrl($paymentProcessor);
-//        CRM_Core_Error::debug_var('thanxUrl', $thanxUrl);
-//        CRM_Core_Error::debug_var('failureUrl', $failureUrl);
-//        CRM_Core_Error::debug_var('paymentToken', $paymentToken);
-        $url = $paymentProcessor->url_site . '/payment/4.1/paymentInquiry';    //Get url_site from 2C2P PGW Dashboard
+//        $decodedTokenResponse = self::getPaymentInquiryViaPaymentToken($invoiceId);
+        $decodedTokenResponse = self::getPaymentInquiryViaKeySignature($invoiceId);
+        CRM_Core_Error::debug_var('contribution', $contribution['contribution_recur_id']);
+        if ($contribution['contribution_recur_id'] != null) {
+            //todo part about recurring payment
 //        CRM_Core_Error::debug_var('url', $url);
-        $secretkey = $paymentProcessor->password;
-        $merchantID = $paymentProcessor->user_name;
-        $payload = array(
-            "paymentToken" => $paymentToken,
-            "merchantID" => $merchantID,
-            "invoiceNo" => $invoiceId,
-            "locale" => "en");
-//        CRM_Core_Error::debug_var('payload', $payload);
-        $inquiryRequestData = self::encodeJwtData($secretkey, $payload);
-//        CRM_Core_Error::debug_var('inquiryRequestData', $inquiryRequestData);
-        $encodedTokenResponse = self::getEncodedResponse($url, $inquiryRequestData);
-//        CRM_Core_Error::debug_var('encodedTokenResponse', $encodedTokenResponse);
-        $decodedTokenResponse = self::getDecodedResponse($secretkey, $encodedTokenResponse);
-        CRM_Core_Error::debug_var('decodedTokenResponse', $decodedTokenResponse);
-//        CRM_Core_Error::debug_var('url', $url);
-        $resp_code = $decodedTokenResponse['respCode'];
-//        CRM_Core_Error::debug_var('resp_code', $resp_code);
-        /*
-         *     [recurringUniqueID] => 170959
-            [tranRef] => 4990727
-            [referenceNo] => 4606096
-         */
-        $tranRef = $decodedTokenResponse['tranRef'];
-        $recurringUniqueID = $decodedTokenResponse['recurringUniqueID'];
-        $referenceNo = $decodedTokenResponse['referenceNo'];
-        $query = "UPDATE civicrm_payment_token SET 
+            $resp_code = $decodedTokenResponse['respCode'];
+            $tranRef = $decodedTokenResponse['tranRef'];
+            $recurringUniqueID = $decodedTokenResponse['recurringUniqueID'];
+            $referenceNo = $decodedTokenResponse['referenceNo'];
+
+            $query = "UPDATE civicrm_payment_token SET 
                                 billing_first_name='$recurringUniqueID',
                                  billing_middle_name='$tranRef',
                                  billing_last_name='$referenceNo'
                       where masked_account_number='$invoiceId'";
-        CRM_Core_DAO::executeQuery($query);
-        if ($resp_code != "0000") {
+            CRM_Core_DAO::executeQuery($query);
+        }
+        $resp_code = $decodedTokenResponse['respCode'];
+//        CRM_Core_Error::debug_var('resp_code', $resp_code);
+        if ($resp_code != "00") {
+            throw new CRM_Core_Exception(self::PAYMENT_RESPONCE[$resp_code]);
+        }
+        $contribution_status = $decodedTokenResponse['status'];
+
+        if (!in_array($contribution_status, ["A", "S"])) {
 //        CRM_Core_Error::debug_var('decodedTokenResponse', $decodedTokenResponse);
 
             //            throw new CRM_Core_Exception(self::PAYMENT_RESPONCE[$resp_code]);
 //            CRM_Core_Error::statusBounce(ts(self::PAYMENT_RESPONCE[$resp_code] . ts('2c2p Error:') . 'error', $url, 'error'));
             $contribution_status_id = 4;
-            if ($resp_code == "0003") {
+            if ($contribution_status == "V") {
                 $contribution_status_id = CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Cancelled');
             }
-            if ($resp_code == "0001") {
+            if (in_array($contribution_status, ["AP", "RP", "VP"])) {
                 $contribution_status_id =
                     CRM_Core_PseudoConstant::getKey(
                         'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Pending');
             }
-            if ($resp_code == "2001") {
+            if ($contribution_status == "RS") {
                 $contribution_status_id =
                     CRM_Core_PseudoConstant::getKey(
                         'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'In Progress');
+            }
+            if ($contribution_status == "RF") {
+                $contribution_status_id =
+                    CRM_Core_PseudoConstant::getKey(
+                        'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Refunded');
             }
             $query = "UPDATE civicrm_contribution SET 
                                 contribution_status_id=$contribution_status_id 
                       where invoice_id='$invoiceId'";
             CRM_Core_DAO::executeQuery($query);
-//            CRM_Core_Error::statusBounce(ts($_POST['respDesc']) . ts('2c2p Error:') . 'error', $url, 'error');
-            CRM_Utils_System::redirect($failureUrl);
+//            CRM_Core_Error::debug_var('contribution_status_id', $contribution_status_id);
             return;
         }
-        $cardNo = substr($decodedTokenResponse['cardNo'], -4);
-        $cardType = $decodedTokenResponse['cardType'];
-        $channelCode = $decodedTokenResponse['channelCode'];
+        $cardNo = substr($decodedTokenResponse['maskedPan'], -4);
+        $cardType = $decodedTokenResponse['paymentScheme'];
+        $channelCode = $decodedTokenResponse['processBy'];
         $cardTypeId = 2;
         $paymentInstrumentId = null;
-        if ($cardType == 'CREDIT') {
-//            $cardTypeId = 1;
-            $paymentInstrumentId = 1;
-        }
+        $paymentInstrumentId = 1;
         if ($channelCode == 'VI') {
             $cardTypeId = 1;
-//            $paymentInstrumentId = 1;
         }
 
+        CRM_Core_Error::debug_var('contribution_status_id', "SUPER");
 
         $contributionId = $contribution['id'];
-
+        $paymentProcessorId = self::getPaymentProcessorIdViaInvoiceID($invoiceId);
+        $thanxUrl = self::getThanxUrlViaInvoiceID($invoiceId);
+        $failureUrl = self::getFailureUrlViaInvoiceID($invoiceId);
+        $failed_status =                     CRM_Core_PseudoConstant::getKey(
+            'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Failed');;
+        $cancelled_status =                     CRM_Core_PseudoConstant::getKey(
+            'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Cancelled');;
+        $pending_status =                     CRM_Core_PseudoConstant::getKey(
+            'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Pending');
+        if(in_array($contribution['contribution_status_id'], [$failed_status, $cancelled_status])){
+            $query = "UPDATE civicrm_contribution SET 
+                                contribution_status_id=$pending_status 
+                      where invoice_id='$invoiceId'";
+            CRM_Core_DAO::executeQuery($query);
+        }
         try {
             civicrm_api3('contribution', 'completetransaction',
                 ['id' => $contributionId,
@@ -960,7 +1230,6 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             if (!stristr($e->getMessage(), 'Contribution already completed')) {
                 Civi::log()->debug("2c2p IPN Error Updating contribution: " . $e->getMessage());
                 CRM_Utils_System::redirect($failureUrl);
-
             }
         }
         CRM_Utils_System::redirect($thanxUrl);
@@ -971,15 +1240,17 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     /**
      * @param $invoiceId
      * @param string $url
+     * @throws CRM_Core_Exception
      */
-    public
-    function setContributionStatusRejected($invoiceId, string $url): void
+    public static
+    function setContributionStatusRejected($invoiceId): void
     {
+        $failureUrl = self::getFailureUrlViaInvoiceID($invoiceId);
         $query = "UPDATE civicrm_contribution SET check_number='' where invoice_id='$invoiceId'";
         CRM_Core_DAO::executeQuery($query);
         $query = "UPDATE civicrm_contribution SET contribution_status_id=4 where invoice_id='$invoiceId'";
         CRM_Core_DAO::executeQuery($query);
-        CRM_Core_Error::statusBounce(ts($_POST['respDesc']) . ts('2c2p Error:') . 'error', $url, 'error');
+        CRM_Core_Error::statusBounce(ts($_POST['respDesc']) . ts('2c2p Error:') . 'error', $failureUrl, 'error');
     }
 
 
@@ -1072,8 +1343,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //        CRM_Core_Error::debug_var('invoiceId', $invoiceId);
         if ($invoiceId) {
             try {
-//        CRM_Core_Error::debug_var('before', $invoiceId);
-                self::setContributionStatusRecieved($invoiceId);
+//                CRM_Core_Error::debug_var('before', $invoiceId);
+                self::setRecievedContributionStatus($invoiceId);
 //            CRM_Core_Error::debug_var('after', $invoiceId);
             } catch (Exception $e) {
                 CRM_Core_Error::debug_var('error', $e->getMessage());
@@ -1081,8 +1352,328 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             }
         } else {
             CRM_Core_Error::statusBounce("No Invoice ID", null, '2c2p');
-
         }
     }
+
+    /**
+     * @param $response
+     * @param $path_to_2c2p_certificate
+     * @param $path_to_merchant_pem
+     * @param $merchant_password
+     * @param $merchant_secret
+     * @throws CRM_Core_Exception
+     */
+
+    public static function getPaymentFrom2c2pResponse($response,
+                                                      $path_to_2c2p_certificate,
+                                                      $path_to_merchant_pem,
+                                                      $merchant_password,
+                                                      $merchant_secret): array
+    {
+        //credentials part
+        $receiverPublicCertPath = $path_to_2c2p_certificate;
+        $receiverPublicCertKey = \Jose\Component\KeyManagement\JWKFactory::createFromCertificateFile(
+            $receiverPublicCertPath, // The filename
+        );
+
+        $senderPrivateKeyPath = $path_to_merchant_pem;
+
+        $senderPrivateKeyPassword = $merchant_password;
+        $jw_signature_key = \Jose\Component\KeyManagement\JWKFactory::createFromKeyFile(
+            $senderPrivateKeyPath,
+            $senderPrivateKeyPassword
+        );
+
+        $secretKey = $merchant_secret;    //Get SecretKey from 2C2P PGW Dashboard
+//end credentials part
+
+        $response_body = $response->getBody()->getContents();
+
+        $signatureAlgorithmManager = new \Jose\Component\Core\AlgorithmManager([
+            new \Jose\Component\Signature\Algorithm\PS256(),
+        ]);
+
+
+        // We instantiate our JWS Verifier.
+        $jwsVerifier = new \Jose\Component\Signature\JWSVerifier(
+            $signatureAlgorithmManager
+        );
+
+        $signature_serializer = new \Jose\Component\Signature\Serializer\CompactSerializer(); // The serializer
+
+        $signatureSerializerManager = new \Jose\Component\Signature\Serializer\JWSSerializerManager([
+            $signature_serializer,
+        ]);
+
+        $headerSignatureCheckerManager = new \Jose\Component\Checker\HeaderCheckerManager(
+            [
+                new \Jose\Component\Checker\AlgorithmChecker(['PS256']),
+            ],
+            [
+                new \Jose\Component\Signature\JWSTokenSupport(), // Adds JWS token type support
+            ]
+        );
+
+        try {
+            $jw_signed_response = $signature_serializer->unserialize($response_body);
+            $isVerified = $jwsVerifier->verifyWithKey($jw_signed_response, $receiverPublicCertKey, 0);
+            if ($isVerified) {
+
+                $jwsLoader = new \Jose\Component\Signature\JWSLoader(
+                    $signatureSerializerManager,
+                    $jwsVerifier,
+                    $headerSignatureCheckerManager
+                );
+
+                $jwsigned_response_loaded = $jwsLoader->loadAndVerifyWithKey((string)$response_body, $receiverPublicCertKey, $signature, null);
+                $encrypted_serialized_response = $jwsigned_response_loaded->getPayload();
+            } else {
+                throw new CRM_Core_Exception(ts("2c2p Error: Not Verified "));
+            }
+
+        } catch (Exception $e) {
+            $em = $e->getMessage();
+            throw new CRM_Core_Exception(ts("2c2p Error: $em "));
+        }
+
+
+        $encryption_serializer = new \Jose\Component\Encryption\Serializer\CompactSerializer(); // The serializer
+
+        try {
+
+            $encryptionSerializerManager = new \Jose\Component\Encryption\Serializer\JWESerializerManager([
+                $encryption_serializer,
+            ]);
+
+            $jw_encrypted_response = $encryption_serializer->unserialize($encrypted_serialized_response);
+
+            // The key encryption algorithm manager with the A256KW algorithm.
+            $keyEncryptionAlgorithmManager = new \Jose\Component\Core\AlgorithmManager([
+                new \Jose\Component\Encryption\Algorithm\KeyEncryption\RSAOAEP(),
+            ]);
+
+// The content encryption algorithm manager with the A256CBC-HS256 algorithm.
+            $contentEncryptionAlgorithmManager = new \Jose\Component\Core\AlgorithmManager([
+                new \Jose\Component\Encryption\Algorithm\ContentEncryption\A256GCM(),
+            ]);
+
+// The compression method manager with the DEF (Deflate) method.
+            $compressionMethodManager = new \Jose\Component\Encryption\Compression\CompressionMethodManager([
+                new \Jose\Component\Encryption\Compression\Deflate(),
+            ]);
+
+// We instantiate our JWE Decrypter.
+            $jweDecrypter = new \Jose\Component\Encryption\JWEDecrypter(
+                $keyEncryptionAlgorithmManager,
+                $contentEncryptionAlgorithmManager,
+                $compressionMethodManager
+            );
+            $headerCheckerManagerE = new \Jose\Component\Checker\HeaderCheckerManager(
+                [
+                    new \Jose\Component\Checker\AlgorithmChecker(['RSA-OAEP']),
+                ],
+                [
+                    new \Jose\Component\Encryption\JWETokenSupport(), // Adds JWS token type support
+                ]
+            );
+
+            $success = $jweDecrypter->decryptUsingKey($jw_encrypted_response, $jw_signature_key, 0);
+//        echo $success;
+            $jweLoader = new \Jose\Component\Encryption\JWELoader(
+                $encryptionSerializerManager,
+                $jweDecrypter,
+                $headerCheckerManagerE
+            );
+            $jw_encrypted_response = $jweLoader->loadAndDecryptWithKey($encrypted_serialized_response,
+                $jw_signature_key,
+                $recipient);
+            $unencrypted_payload = $jw_encrypted_response->getPayload();
+
+
+        } catch (Exception $e) {
+            throw new CRM_Core_Exception(ts('2c2p - JWE Error'));
+        }
+        echo $unencrypted_payload;
+//        if($request_type == "RecurringMaintenanceRequest"){
+//        $answer = self::unencryptRecurringPaymentAnswer($unencrypted_payload, $secretKey);
+//        }
+//        if($request_type == "PaymentProcessRequest"){
+        $answer = self::unencryptPaymentAnswer($unencrypted_payload, $secretKey);
+//        }
+        return $answer;
+    }
+
+    /**
+     * @param array $payment_inquiry
+     * @return \Psr\Http\Message\ResponseInterface
+     * @throws CRM_Core_Exception
+     */
+    public static function getPaymentResponseViaKeySignature(
+        array $payment_inquiry): \Psr\Http\Message\ResponseInterface
+    {
+        CRM_Core_Error::debug_var('payment_inquiry', $payment_inquiry);
+
+        $invoiceId = $payment_inquiry['invoiceNo'];
+
+        $paymentProcessorId = self::getPaymentProcessorIdViaInvoiceID($invoiceId);
+        $paymentProcessor = self::getPaymentProcessorViaProcessorID($paymentProcessorId);
+        $receiverPublicCertPath = $paymentProcessor->getOpenCertificatePath();
+        $senderPrivateKeyPath = $paymentProcessor->getClosedCertificatePath();
+        $senderPrivateKeyPassword = $paymentProcessor->getClosedCertificatePwd(); //private key password
+        $payment_processor = $paymentProcessor->_paymentProcessor;
+        $merchantID = $payment_processor['user_name'];        //Get MerchantID when opening account with 2C2P
+        $secretKey = $payment_processor['password'];    //Get SecretKey from 2C2P PGW Dashboard
+//        $url = $paymentProcessor->url_site . '/payment/4.1/paymentInquiry';
+        $url = "https://demo2.2c2p.com/2C2PFrontend/PaymentAction/2.0/action";
+// The key encryption algorithm manager with the A256KW algorithm.
+        CRM_Core_Error::debug_var('keyEncryptionAlgorithmManager', '0');
+        CRM_Core_Error::debug_var('keyEncryptionAlgorithmManager', '1');
+        try {
+            $keyEncryptionAlgorithmManager = new \Jose\Component\Core\AlgorithmManager([
+                new \Jose\Component\Encryption\Algorithm\KeyEncryption\RSAOAEP(),
+            ]);
+            CRM_Core_Error::debug_var('keyEncryptionAlgorithmManager', $keyEncryptionAlgorithmManager->list());
+        } catch (CRM_Core_Exception $e) {
+            throw new CRM_Core_Exception(ts('2c2p - Unvalid keyEncryptionAlgorithmManager') . $e->getMessage());
+        }
+        CRM_Core_Error::debug_var('keyEncryptionAlgorithmManager', '1');
+
+// The content encryption algorithm manager with the A256CBC-HS256 algorithm.
+        try {
+            $contentEncryptionAlgorithmManager = new \Jose\Component\Core\AlgorithmManager([
+                new \Jose\Component\Encryption\Algorithm\ContentEncryption\A256GCM(),
+            ]);
+        } catch (CRM_Core_Exception $e) {
+            throw new CRM_Core_Exception(ts('2c2p - Unvalid contentEncryptionAlgorithmManager') . $e->getMessage());
+        }
+        CRM_Core_Error::debug_var('contentEncryptionAlgorithmManager', '2');
+
+// The compression method manager with the DEF (Deflate) method.
+        $compressionMethodManager = new \Jose\Component\Encryption\Compression\CompressionMethodManager([
+            new \Jose\Component\Encryption\Compression\Deflate(),
+        ]);
+
+// We instantiate our JWE Builder.
+        $jwencryptedBuilder = new \Jose\Component\Encryption\JWEBuilder(
+            $keyEncryptionAlgorithmManager,
+            $contentEncryptionAlgorithmManager,
+            $compressionMethodManager
+        );
+
+
+// Our key.
+        $receiverPublicCertKey = \Jose\Component\KeyManagement\JWKFactory::createFromCertificateFile(
+            $receiverPublicCertPath, // The filename
+        );
+
+
+        $stringToHashOne = "";
+        $stringXML = "<" . $payment_inquiry["request_type"] . ">";
+        foreach ($payment_inquiry as $key => $value) {
+            if ($key != "request_type") {
+                $stringToHashOne = $stringToHashOne . $value;
+                $stringXML = $stringXML . "\n<" . $key . ">" . $value . "</" . $key . ">";
+            }
+        }
+        $hashone = strtoupper(hash_hmac('sha1', $stringToHashOne, $secretKey, false));    //Compute hash value
+        $stringXML = $stringXML . "<hashValue>$hashone</hashValue>";
+        $stringXML = $stringXML . "\n</" . $payment_inquiry["request_type"] . ">";
+        $xml = $stringXML;
+        CRM_Core_Error::debug_var('xml', $xml);
+
+
+//return;
+        $jw_encrypted_response = $jwencryptedBuilder
+            ->create()// We want to create a new JWE
+            ->withPayload($xml)// We set the payload
+            ->withSharedProtectedHeader([
+                'alg' => 'RSA-OAEP', // Key Encryption Algorithm
+                'enc' => 'A256GCM',  // Content Encryption Algorithm
+                'typ' => 'JWT'
+//        'zip' => 'DEF'       // We enable the compression (irrelevant as the payload is small, just for the example).
+            ])
+            ->addRecipient($receiverPublicCertKey)// We add a recipient (a shared key or public key).
+            ->build();
+
+        $encryption_serializer = new \Jose\Component\Encryption\Serializer\CompactSerializer(); // The serializer
+        $jwe_request_payload = $encryption_serializer->serialize($jw_encrypted_response, 0); // We serialize the recipient at index 0 (we only have one recipient).
+
+// The algorithm manager with the HS256 algorithm.
+        $signatureAlgorithmManager = new \Jose\Component\Core\AlgorithmManager([
+            new \Jose\Component\Signature\Algorithm\PS256(),
+        ]);
+
+// Our key.
+//echo "jwk:\n";
+        $jw_signature_key = \Jose\Component\KeyManagement\JWKFactory::createFromKeyFile(
+            $senderPrivateKeyPath,
+            $senderPrivateKeyPassword
+        );
+
+
+        $jwsBuilder = new \Jose\Component\Signature\JWSBuilder($signatureAlgorithmManager);
+
+        $jw_signed_request = $jwsBuilder
+            ->create()// We want to create a new JWS
+            ->withPayload($jwe_request_payload)// We set the payload
+            ->addSignature($jw_signature_key, ['alg' => 'PS256', 'typ' => 'JWT'])// We add a signature with a simple protected header
+            ->build();
+
+
+        $signature_serializer = new \Jose\Component\Signature\Serializer\CompactSerializer(); // The serializer
+
+        $jw_signed_payload = $signature_serializer->serialize($jw_signed_request, 0); // We serialize the signature at index 0 (we only have one signature).
+
+        $client = new GuzzleHttp\Client();
+        $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Guzzle';
+
+
+        try {
+            $response = $client->request('POST', $url, [
+                'body' => $jw_signed_payload,
+                'user_agent' => $user_agent,
+                'headers' => [
+                    'Accept' => 'text/plain',
+                    'Content-Type' => 'application/*+json',
+                    'X-VPS-Timeout' => '45',
+
+                ],
+            ]);
+
+        } catch (GuzzleHttp\Exception\GuzzleException $e) {
+            print("\n2:\n" . $e->getMessage());
+        }
+        return $response;
+    }
+
+    /**
+     * @return string
+     */
+    private function getOpenCertificatePath()
+    {
+        $path = E::path();
+        $path_to_2c2p_certificate = $path . DIRECTORY_SEPARATOR . "includes" . DIRECTORY_SEPARATOR . self::OPEN_CERTIFICATE_FILE_NAME;
+        return $path_to_2c2p_certificate;
+    }
+
+    /**
+     * @return string
+     */
+    private function getClosedCertificatePath()
+    {
+        $path = E::path();
+        $path_to_2c2p_certificate = $path . DIRECTORY_SEPARATOR . "includes" . DIRECTORY_SEPARATOR . self::CLOSED_CERTIFICATE_FILE_NAME;
+        return $path_to_2c2p_certificate;
+    }
+
+    /**
+     * @return string
+     */
+    private function getClosedCertificatePwd()
+    {
+        return self::CLOSED_CERTIFICATE_PWD;
+    }
+
+
 }
 
