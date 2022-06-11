@@ -95,3 +95,9 @@ define( 'CIVICRM_UF_BASEURL'      , 'https://########.ngrok.io');
 
 - 0.1.20 beta - added proc to unsign-unencrypt response from 2c2p server
     developing proc to send signed-encrypted request to 2c2p server
+
+- 0.1.21 beta - changing the way of checking the payment status from 2c2p
+    Redirect after check is not working yet, should redirect manually
+    Refunded status check to do
+    Recurring payments status check to do
+    Void / Cancelled status OK
