@@ -232,14 +232,48 @@ function payment2c2p_civicrm_themes(&$themes)
  */
 function payment2c2p_civicrm_navigationMenu(&$menu)
 {
-    _payment2c2p_civix_insert_navigation_menu($menu, 'Administer/CiviContribute', [
-        'label' => E::ts('2c2p Settings'),
-        'name' => '2c2p_settings',
-        'url' => 'civicrm/payment2c2p/settings',
-        'permission' => 'administer CiviCRM',
-        'operator' => 'OR',
-        'has_separator' => 1,
-        'is_active' => 1,
-    ]);
-    _payment2c2p_civix_navigationMenu($menu);
+//    _payment2c2p_civix_insert_navigation_menu($menu, 'Administer/CiviContribute', [
+//        'label' => E::ts('2c2p Settings'),
+//        'name' => '2c2p_settings',
+//        'url' => 'civicrm/payment2c2p/settings',
+//        'permission' => 'administer CiviCRM',
+//        'operator' => 'OR',
+//        'has_separator' => 1,
+//        'is_active' => 1,
+//    ]);
+//    _payment2c2p_civix_navigationMenu($menu);
+}
+
+/**
+ * Implements hook_civicrm_preProcess().
+ *
+ * This enacts the following
+ * - find and cancel any related payments
+ *
+ * @link https://docs.civicrm.org/dev/en/latest/hooks/hook_civicrm_post
+ *
+ * @throws \CiviCRM_API3_Exception
+ * @throws \API_Exception
+ * @throws CRM_Core_Exception
+ */
+function payment2c2p_civicrm_post($op, $objectName, $objectId, $objectRef) {
+    if ($op === 'edit' && $objectName === 'Contribution') {
+        if (in_array(CRM_Core_PseudoConstant::getName('CRM_Contribute_BAO_Contribution',
+            'contribution_status_id',
+            $objectRef->contribution_status_id),
+            ['Cancelled', 'Failed']
+        )) {
+            payment2c2p_cancel_related_2c2p_record((int) $objectId);
+        }
+    }
+}
+
+
+/**
+ * @param $contributionId
+ * @throws CRM_Core_Exception
+ */
+function payment2c2p_cancel_related_2c2p_record($objectId){
+    CRM_Core_Payment_Payment2c2p::setContributionStatusCancelled($objectId);
+    return $objectId;
 }
