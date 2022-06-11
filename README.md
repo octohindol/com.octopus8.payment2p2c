@@ -103,3 +103,6 @@ define( 'CIVICRM_UF_BASEURL'      , 'https://########.ngrok.io');
     Void / Cancelled status OK
 
 - 0.1.22 beta - Cancelling transaction via EDIT cancels it in the 2c2p system
+
+- 0.1.22 beta - Cancelling transaction via Update status from 2c2p
+   refunds payments in CiviCRM system

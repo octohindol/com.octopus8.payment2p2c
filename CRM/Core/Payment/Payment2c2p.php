@@ -13,13 +13,13 @@ use CRM_Payment2c2p_ExtensionUtil as E;
 
 $autoload = __DIR__ . '/vendor/autoload.php';
 if (file_exists($autoload)) {
-    CRM_Core_Error::debug_var('autoload1', $autoload);
+//    CRM_Core_Error::debug_var('autoload1', $autoload);
     require_once $autoload;
 } else {
     $autoload = E::path() . '/vendor/autoload.php';
     if (file_exists($autoload)) {
         require_once $autoload;
-        CRM_Core_Error::debug_var('autoload2', $autoload);
+//        CRM_Core_Error::debug_var('autoload2', $autoload);
     }
 }
 
@@ -355,6 +355,18 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             'chargeNextDate' => $res_chargeNextDate,
         ];
         return $answer;
+    }
+
+    /**
+     * @param $invoiceId
+     * @param $contribution_status_id
+     */
+    protected static function changeContributionStatusViaDB($invoiceId, $contribution_status_id): void
+    {
+        $query = "UPDATE civicrm_contribution SET 
+                                contribution_status_id=$contribution_status_id 
+                      where invoice_id='$invoiceId'";
+        CRM_Core_DAO::executeQuery($query);
     }
 
     /**
@@ -1162,6 +1174,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     /**
      * @param $invoiceId
      * @throws CRM_Core_Exception
+     * @throws CiviCRM_API3_Exception
      */
     public static function setRecievedContributionStatus($invoiceId): void
     {
@@ -1209,27 +1222,32 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //            CRM_Core_Error::statusBounce(ts(self::PAYMENT_RESPONCE[$resp_code] . ts('2c2p Error:') . 'error', $url, 'error'));
             $contribution_status_id = 4;
             if ($contribution_status == "V") {
-                $contribution_status_id = CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Cancelled');
+                $contribution_status_id
+                    =
+                    CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Cancelled');
+                civicrm_api3('Contribution', 'create', array(
+                    'id' => $contribution['id'],
+                    'contribution_status_id' => $contribution_status_id,
+                ));
             }
             if (in_array($contribution_status, ["AP", "RP", "VP"])) {
                 $contribution_status_id =
                     CRM_Core_PseudoConstant::getKey(
                         'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Pending');
+                self::changeContributionStatusViaDB($invoiceId, $contribution_status_id);
             }
             if ($contribution_status == "RS") {
                 $contribution_status_id =
                     CRM_Core_PseudoConstant::getKey(
                         'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'In Progress');
+                self::changeContributionStatusViaDB($invoiceId, $contribution_status_id);
             }
             if ($contribution_status == "RF") {
                 $contribution_status_id =
                     CRM_Core_PseudoConstant::getKey(
                         'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Refunded');
+                self::changeContributionStatusViaDB($invoiceId, $contribution_status_id);
             }
-            $query = "UPDATE civicrm_contribution SET 
-                                contribution_status_id=$contribution_status_id 
-                      where invoice_id='$invoiceId'";
-            CRM_Core_DAO::executeQuery($query);
 //            CRM_Core_Error::debug_var('contribution_status_id', $contribution_status_id);
             return;
         }
@@ -1248,17 +1266,15 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $paymentProcessorId = self::getPaymentProcessorIdViaInvoiceID($invoiceId);
         $thanxUrl = self::getThanxUrlViaInvoiceID($invoiceId);
         $failureUrl = self::getFailureUrlViaInvoiceID($invoiceId);
-        $failed_status =                     CRM_Core_PseudoConstant::getKey(
+        $failed_status_id =                     CRM_Core_PseudoConstant::getKey(
             'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Failed');;
-        $cancelled_status =                     CRM_Core_PseudoConstant::getKey(
+        $cancelled_status_id =                     CRM_Core_PseudoConstant::getKey(
             'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Cancelled');;
-        $pending_status =                     CRM_Core_PseudoConstant::getKey(
+        $pending_status_id =                     CRM_Core_PseudoConstant::getKey(
             'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Pending');
-        if(in_array($contribution['contribution_status_id'], [$failed_status, $cancelled_status])){
-            $query = "UPDATE civicrm_contribution SET 
-                                contribution_status_id=$pending_status 
-                      where invoice_id='$invoiceId'";
-            CRM_Core_DAO::executeQuery($query);
+        if(in_array($contribution['contribution_status_id'], [$failed_status_id, $cancelled_status_id])){
+            self::changeContributionStatusViaDB($invoiceId, $pending_status_id);
+            //to give possibility to make it fulfiled
         }
         try {
             civicrm_api3('contribution', 'completetransaction',
