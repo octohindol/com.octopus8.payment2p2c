@@ -267,9 +267,9 @@ function payment2c2p_civicrm_post($op, $objectName, $objectId, $objectRef) {
         }
     }
     if($op = 'create'){
-        CRM_Core_Error::debug_var('objectName', $objectName);
-        CRM_Core_Error::debug_var('objectId', $objectId);
-        CRM_Core_Error::debug_var('objectRef', $objectRef);
+//        CRM_Core_Error::debug_var('objectName', $objectName);
+//        CRM_Core_Error::debug_var('objectId', $objectId);
+//        CRM_Core_Error::debug_var('objectRef', $objectRef);
     }
 }
 
