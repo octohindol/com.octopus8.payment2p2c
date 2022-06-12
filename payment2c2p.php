@@ -266,6 +266,11 @@ function payment2c2p_civicrm_post($op, $objectName, $objectId, $objectRef) {
             payment2c2p_cancel_related_2c2p_record((int) $objectId);
         }
     }
+    if($op = 'create'){
+        CRM_Core_Error::debug_var('objectName', $objectName);
+        CRM_Core_Error::debug_var('objectId', $objectId);
+        CRM_Core_Error::debug_var('objectRef', $objectRef);
+    }
 }
 
 
