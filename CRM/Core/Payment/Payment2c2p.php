@@ -1225,10 +1225,15 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                 $contribution_status_id
                     =
                     CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Cancelled');
-                civicrm_api3('Contribution', 'create', array(
+                $contribution_change = array(
                     'id' => $contribution['id'],
+//                    'cancel_reason' => $params['cancel_reason'] ?? NULL,
                     'contribution_status_id' => $contribution_status_id,
-                ));
+                );
+                if(!key_exist('cancel_date', $contribution) || $contribution['cancel_date'] == null || $contribution['cancel_date'] == ""){
+                    $contribution_change['cancel_date'] = date('YmdHis');
+                }
+                civicrm_api3('Contribution', 'create', $contribution_change);
             }
             if (in_array($contribution_status, ["AP", "RP", "VP"])) {
                 $contribution_status_id =
@@ -1246,7 +1251,15 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                 $contribution_status_id =
                     CRM_Core_PseudoConstant::getKey(
                         'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Refunded');
-                self::changeContributionStatusViaDB($invoiceId, $contribution_status_id);
+                $contribution_change = array(
+                    'id' => $contribution['id'],
+//                    'cancel_reason' => $params['cancel_reason'] ?? NULL,
+                    'contribution_status_id' => $contribution_status_id,
+                );
+                if(!key_exist('cancel_date', $contribution) || $contribution['cancel_date'] == null || $contribution['cancel_date'] == ""){
+                    $contribution_change['cancel_date'] = date('YmdHis');
+                }
+                civicrm_api3('Contribution', 'create', $contribution_change);
             }
 //            CRM_Core_Error::debug_var('contribution_status_id', $contribution_status_id);
             return;
@@ -1282,6 +1295,9 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                     'trxn_id' => $trxnId,
                     'pan_truncation' => $cardNo,
                     'card_type_id' => $cardTypeId,
+                    'cancel_date' => "",
+                    'cancel_reason' => "",
+                    'is_email_receipt' => false,
                     'payment_instrument_id' => $paymentInstrumentId,
                     'processor_id' => $paymentProcessorId]);
         } catch (CiviCRM_API3_Exception $e) {
@@ -1315,7 +1331,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //        $decodedTokenResponse = self::getPaymentInquiryViaPaymentToken($invoiceId);
         $invoiceId = $contribution["invoice_id"];
         $cancelledTokenResponse = self::setPaymentInquiryViaKeySignature($invoiceId, "V");
-        CRM_Core_Error::debug_var('decodedTokenResponse', $cancelledTokenResponse);
+//        CRM_Core_Error::debug_var('decodedTokenResponse', $cancelledTokenResponse);
     }
 
     /**
