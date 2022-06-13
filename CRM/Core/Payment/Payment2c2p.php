@@ -1702,9 +1702,9 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $merchantID = $payment_processor['user_name'];        //Get MerchantID when opening account with 2C2P
         $secretKey = $payment_processor['password'];    //Get SecretKey from 2C2P PGW Dashboard
 //        $url = $paymentProcessor->url_site . '/payment/4.1/paymentInquiry';
-        $url = $payment_processor['url_api_default'];
+        $url = $payment_processor['url_api'];
 // The key encryption algorithm manager with the A256KW algorithm.
-//        CRM_Core_Error::debug_var('keyEncryptionAlgorithmManager', '0');
+//        CRM_Core_Error::debug_var('url_api', $url);
 //        CRM_Core_Error::debug_var('keyEncryptionAlgorithmManager', '1');
         try {
             $keyEncryptionAlgorithmManager = new \Jose\Component\Core\AlgorithmManager([
