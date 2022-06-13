@@ -1398,17 +1398,15 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             CRM_Core_DAO::executeQuery($query);
         }
         $resp_code = strval($decodedTokenResponse['respCode']);
-//        CRM_Core_Error::debug_var('resp_code', $resp_code);
+        CRM_Core_Error::debug_var('decodedTokenResponse', $decodedTokenResponse);
+
+        //        CRM_Core_Error::debug_var('resp_code', $resp_code);
         if ($resp_code == "15") {
             self::setContributionStatusCancelled($contribution);
             return;
         }
         if ($resp_code == "16") {
             self::setContributionStatusCancelled($contribution);
-            return;
-        }
-        if ($resp_code !== "00") {
-//                self::setContributionStatusCancelled($contribution);
             return;
         }
         $contribution_status = $decodedTokenResponse['status'];
@@ -1428,8 +1426,21 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         }
         if ($contribution_status !== "A") {
 
-            if ($contribution_status === "V") {
+            if (in_array($contribution_status, [
+                "V"])) {
                 self::setContributionStatusCancelled($contribution);
+                return;
+            }
+            if (in_array($contribution_status, [
+                "AR",
+                "FF",
+                "IP",
+                "ROE",
+                "EX",
+                "CTF"])) {
+                $failed_status_id = CRM_Core_PseudoConstant::getKey(
+                    'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Failed');
+                self::changeContributionStatusViaDB($invoiceId, $failed_status_id);
                 return;
             }
 
