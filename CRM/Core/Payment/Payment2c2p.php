@@ -1653,7 +1653,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                 $receiverPublicCertPath, // The filename
             );
         } catch (Exception $e) {
-            new CRM_Core_Exception("2c2p Error: " . $e->getMessage());
+            throw new CRM_Core_Exception("2c2p Error: " . $e->getMessage());
         }
 
         $senderPrivateKeyPath = $path_to_merchant_pem;
@@ -1665,7 +1665,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                 $senderPrivateKeyPassword
             );
         } catch (Exception $e) {
-            new CRM_Core_Exception("2c2p Error: " . $e->getMessage());
+            throw new CRM_Core_Exception("2c2p Error: " . $e->getMessage());
 
         }
 
@@ -1703,7 +1703,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         try {
             $isVerified = $jwsVerifier->verifyWithKey($jw_signed_response, $receiverPublicCertKey, 0);
         } catch (Exception $e) {
-            new CRM_Core_Exception("2c2p Error: " . $e->getMessage());
+            throw new CRM_Core_Exception("2c2p Error: " . $e->getMessage());
 
         }
         if ($isVerified) {
