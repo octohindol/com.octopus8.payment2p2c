@@ -774,11 +774,9 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      */
     private static function getThanxUrlViaInvoiceID($invoiceID): string
     {
-        $payment_token = self::getPaymentTokenViaInvoiceID($invoiceID);
-        $paymentProcessorId = $payment_token['payment_processor_id'];
-        $paymentProcessor = self::getPaymentProcessorViaProcessorID($paymentProcessorId);
-        $paymentProcessor = (array)$paymentProcessor;
-        $thanxUrl = strval($paymentProcessor['subject']);
+        $paymentProcessor = self::getPaymentProcessorIdViaInvoiceID($invoiceID);
+        $payment_processor_array = $paymentProcessor->_paymentProcessor;
+        $thanxUrl = strval($payment_processor_array['subject']);
         if ($thanxUrl == null || $thanxUrl == "") {
             $thanxUrl = CRM_Utils_System::url();
 //            CRM_Core_Error::debug_var('thanxUrl1', $thanxUrl);
@@ -793,11 +791,10 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      */
     private static function getFailureUrlViaInvoiceID($invoiceID): string
     {
-        $payment_token = self::getPaymentTokenViaInvoiceID($invoiceID);
-        $paymentProcessorId = $payment_token['payment_processor_id'];
-        $paymentProcessor = self::getPaymentProcessorViaProcessorID($paymentProcessorId);
-        $paymentProcessor = (array)$paymentProcessor;
-        $failureUrl = strval($paymentProcessor['signature']);
+
+        $paymentProcessor = self::getPaymentProcessorIdViaInvoiceID($invoiceID);
+        $payment_processor_array = $paymentProcessor->_paymentProcessor;
+        $failureUrl = strval($payment_processor_array['signature']);
         if ($failureUrl == null || $failureUrl == "") {
             $failureUrl = CRM_Utils_System::url();
 //            CRM_Core_Error::debug_var('thanxUrl1', $thanxUrl);
