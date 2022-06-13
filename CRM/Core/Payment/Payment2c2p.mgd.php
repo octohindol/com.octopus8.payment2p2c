@@ -24,6 +24,8 @@ return [
             'is_recur' => 0,
             'url_site_test_default' => 'https://sandbox-pgw.2c2p.com',
             'url_site_default' => 'https://pgw.2c2p.com',
+            'url_api_test_default' => 'https://demo2.2c2p.com/2C2PFrontend/PaymentAction/2.0/action',
+            'url_api_default' => 'https://t.2c2p.com/PaymentAction/2.0/action',
         ],
     ],
 ];
