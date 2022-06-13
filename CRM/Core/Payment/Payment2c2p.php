@@ -13,13 +13,13 @@ use CRM_Payment2c2p_ExtensionUtil as E;
 
 $autoload = __DIR__ . '/vendor/autoload.php';
 if (file_exists($autoload)) {
-//    CRM_Core_Error::debug_var('autoload1', $autoload);
+    CRM_Core_Error::debug_var('autoload1', $autoload);
     require_once $autoload;
 } else {
     $autoload = E::path() . '/vendor/autoload.php';
     if (file_exists($autoload)) {
         require_once $autoload;
-//        CRM_Core_Error::debug_var('autoload2', $autoload);
+        CRM_Core_Error::debug_var('autoload2', $autoload);
     }
 }
 
@@ -484,7 +484,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      * @return array
      * @throws CRM_Core_Exception
      */
-    public static function getPaymentInquiryViaKeySignature($invoiceID): array
+    public static function getPaymentInquiryViaKeySignature($invoiceID, $processType = "I"): array
     {
         $paymentProcessorId = self::getPaymentProcessorIdViaInvoiceID($invoiceID);
         $paymentProcessor = self::getPaymentProcessorViaProcessorID($paymentProcessorId);
@@ -498,7 +498,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 
         $payment_inquiry = array(
             'version' => "3.8",
-            'processType' => "I",
+            'processType' => $processType,
             'invoiceNo' => $invoiceID,
             'timeStamp' => $time_stamp,
             'merchantID' => $merchant_id,
@@ -510,17 +510,18 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $response = self::getPaymentResponseViaKeySignature(
             $payment_inquiry,
             );
-//        CRM_Core_Error::debug_var('response', $response);
-
+        $response_body_contents = $response->getBody()->getContents();
+//        CRM_Core_Error::debug_var('$response_body_contents_before', $response_body_contents);
         $path_to_2c2p_certificate = $paymentProcessor->getOpenCertificatePath();
         $path_to_merchant_pem = $paymentProcessor->getClosedCertificatePath();
         $merchant_password = $paymentProcessor->getClosedCertificatePwd();
         $answer =
-            CRM_Core_Payment_Payment2c2p::getPaymentFrom2c2pResponse($response,
+            CRM_Core_Payment_Payment2c2p::getPaymentFrom2c2pResponse($response_body_contents,
                 $path_to_2c2p_certificate,
                 $path_to_merchant_pem,
                 $merchant_password,
                 $merchant_secret);
+//        CRM_Core_Error::debug_var('answer', $answer);
 
         return $answer;
     }
@@ -530,7 +531,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      * @return array
      * @throws CRM_Core_Exception
      */
-    public static function setPaymentInquiryViaKeySignature($invoiceID): array
+    public static function setPaymentInquiryViaKeySignature($invoiceID, $status = "", $amount = ""): array
     {
         $paymentProcessorId = self::getPaymentProcessorIdViaInvoiceID($invoiceID);
         $paymentProcessor = self::getPaymentProcessorViaProcessorID($paymentProcessorId);
@@ -541,32 +542,46 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 
         $date = date('Y-m-d');
         $time_stamp = date('dmyhis', strtotime($date) . ' +1 day');
-
-        $payment_inquiry = array(
-            'version' => "3.8",
-            'processType' => "V",
-            'invoiceNo' => $invoiceID,
-            'timeStamp' => $time_stamp,
-            'merchantID' => $merchant_id,
-            'actionAmount' => "",
-            'request_type' => "PaymentProcessRequest"
-        );
+        if ($status === "V") {
+            $payment_inquiry = array(
+                'version' => "3.8",
+                'processType' => "V",
+                'invoiceNo' => $invoiceID,
+                'timeStamp' => $time_stamp,
+                'merchantID' => $merchant_id,
+                'actionAmount' => "",
+                'request_type' => "PaymentProcessRequest"
+            );
+        }
+        if ($status === "R") {
+            $payment_inquiry = array(
+                'version' => "3.8",
+                'processType' => "R",
+                'invoiceNo' => $invoiceID,
+                'timeStamp' => $time_stamp,
+                'merchantID' => $merchant_id,
+                'actionAmount' => $amount,
+                'request_type' => "PaymentProcessRequest"
+            );
+        }
 //        CRM_Core_Error::debug_var('payment_inquiry', $payment_inquiry);
 
         $response = self::getPaymentResponseViaKeySignature(
             $payment_inquiry,
             );
-//        CRM_Core_Error::debug_var('response', $response);
+        $response_body_contents = $response->getBody()->getContents();
+//        CRM_Core_Error::debug_var('response_body_contents', $response_body_contents);
 
         $path_to_2c2p_certificate = $paymentProcessor->getOpenCertificatePath();
         $path_to_merchant_pem = $paymentProcessor->getClosedCertificatePath();
         $merchant_password = $paymentProcessor->getClosedCertificatePwd();
         $answer =
-            CRM_Core_Payment_Payment2c2p::getPaymentFrom2c2pResponse($response,
+            CRM_Core_Payment_Payment2c2p::getPaymentFrom2c2pResponse($response_body_contents,
                 $path_to_2c2p_certificate,
                 $path_to_merchant_pem,
                 $merchant_password,
                 $merchant_secret);
+//        CRM_Core_Error::debug_var('answersetPaymentInquiryViaKeySignature', $answer);
 
         return $answer;
     }
@@ -877,10 +892,10 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $params['cid'] = $contact_id;
         $params['destination'] = 'front';
         $frontendReturnUrl = self::getReturnUrl($processor_id, $processor_name, $params, $component);
-        CRM_Core_Error::debug_var('frontendReturnUrl', $frontendReturnUrl);
+//        CRM_Core_Error::debug_var('frontendReturnUrl', $frontendReturnUrl);
         $params['destination'] = 'back';
         $backendReturnUrl = self::getReturnUrl($processor_id, $processor_name, $params, $component);
-        CRM_Core_Error::debug_var('backendReturnUrl', $backendReturnUrl);
+//        CRM_Core_Error::debug_var('backendReturnUrl', $backendReturnUrl);
         if (CRM_Utils_Array::value('is_recur', $params) == TRUE) {
 //
 //            if (CRM_Utils_Array::value('frequency_unit', $params) == 'day') {
@@ -945,7 +960,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             $payload['recurringCount'] = $recurringCount;
         }
 
-        CRM_Core_Error::debug_var('paymentTokenPayload', $payload);
+//        CRM_Core_Error::debug_var('paymentTokenPayload', $payload);
 
         $encodedTokenRequest = self::encodeJwtData($secretKey, $payload);
 
@@ -997,12 +1012,12 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //            'api.PaymentProcessorType.getvalue' => ['return' => "name"],
 //        ]);
         $params = array_merge($_GET, $_REQUEST);
-        CRM_Core_Error::debug_var('getbackparams', $params);
+//        CRM_Core_Error::debug_var('getbackparams', $params);
         $destination = $params['destination'];
 //        if($destination == "front"){
 //
 //        }
-        CRM_Core_Error::debug_var('destination', $destination);
+//        CRM_Core_Error::debug_var('destination', $destination);
         if ($destination == "back") {
             $invoiceId = CRM_Utils_Array::value('inId', $_GET);
             self::setRecievedContributionStatus($invoiceId);
@@ -1025,15 +1040,13 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                 case 'contribute':
 
                     if ($paymentResponse['respCode'] == 2000) {
-                        self::setRecievedContributionStatus($invoiceId);
+                        self::setRecievedContributionStatus($invoiceId, TRUE);
                     } else {
                         self::setContributionStatusRejected($invoiceId);
                     }
                     break;
 
                 case 'event':
-
-
                     if ($paymentResponse['respCode'] == 2000) { // success code
                         $participantId = CRM_Utils_Array::value('pid', $_GET);
                         $eventId = CRM_Utils_Array::value('eid', $_GET);
@@ -1176,7 +1189,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      * @throws CRM_Core_Exception
      * @throws CiviCRM_API3_Exception
      */
-    public static function setRecievedContributionStatus($invoiceId): void
+    public static function setRecievedContributionStatus($invoiceId, $redirect = FALSE): void
     {
 
 
@@ -1208,32 +1221,36 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                       where masked_account_number='$invoiceId'";
             CRM_Core_DAO::executeQuery($query);
         }
-        $resp_code = $decodedTokenResponse['respCode'];
+        $resp_code = strval($decodedTokenResponse['respCode']);
 //        CRM_Core_Error::debug_var('resp_code', $resp_code);
-        if ($resp_code != "00") {
-            throw new CRM_Core_Exception(self::PAYMENT_RESPONCE[$resp_code]);
+        if ($resp_code !== "00") {
+            CRM_Core_Error::statusBounce("2c2p: Please check resp code: " . $resp_code);
+//            throw new CRM_Core_Exception("2c2p: Please check resp code: " . $resp_code);
         }
         $contribution_status = $decodedTokenResponse['status'];
-
+//        CRM_Core_Error::debug_var('contribution_status', $contribution_status);
         if (!in_array($contribution_status, ["A", "S"])) {
 //        CRM_Core_Error::debug_var('decodedTokenResponse', $decodedTokenResponse);
 
             //            throw new CRM_Core_Exception(self::PAYMENT_RESPONCE[$resp_code]);
 //            CRM_Core_Error::statusBounce(ts(self::PAYMENT_RESPONCE[$resp_code] . ts('2c2p Error:') . 'error', $url, 'error'));
             $contribution_status_id = 4;
-            if ($contribution_status == "V") {
+            if ($contribution_status === "V") {
                 $contribution_status_id
                     =
                     CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Cancelled');
+//                CRM_Core_Error::debug_var('contribution_status', $contribution_status_id);
                 $contribution_change = array(
                     'id' => $contribution['id'],
 //                    'cancel_reason' => $params['cancel_reason'] ?? NULL,
                     'contribution_status_id' => $contribution_status_id,
                 );
-                if(!key_exist('cancel_date', $contribution) || $contribution['cancel_date'] == null || $contribution['cancel_date'] == ""){
+                if (!array_key_exists('cancel_date', $contribution) || $contribution['cancel_date'] == null || $contribution['cancel_date'] == "") {
                     $contribution_change['cancel_date'] = date('YmdHis');
                 }
-                civicrm_api3('Contribution', 'create', $contribution_change);
+//                CRM_Core_Error::debug_var('contribution_change', $contribution_change);
+                $result = civicrm_api3('Contribution', 'create', $contribution_change);
+//                CRM_Core_Error::debug_var('change_result', $result);
             }
             if (in_array($contribution_status, ["AP", "RP", "VP"])) {
                 $contribution_status_id =
@@ -1256,7 +1273,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //                    'cancel_reason' => $params['cancel_reason'] ?? NULL,
                     'contribution_status_id' => $contribution_status_id,
                 );
-                if(!key_exist('cancel_date', $contribution) || $contribution['cancel_date'] == null || $contribution['cancel_date'] == ""){
+                if (!key_exist('cancel_date', $contribution) || $contribution['cancel_date'] == null || $contribution['cancel_date'] == "") {
                     $contribution_change['cancel_date'] = date('YmdHis');
                 }
                 civicrm_api3('Contribution', 'create', $contribution_change);
@@ -1277,15 +1294,14 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //        CRM_Core_Error::debug_var('contribution_status_id', "SUPER");
         $contributionId = $contribution['id'];
         $paymentProcessorId = self::getPaymentProcessorIdViaInvoiceID($invoiceId);
-        $thanxUrl = self::getThanxUrlViaInvoiceID($invoiceId);
-        $failureUrl = self::getFailureUrlViaInvoiceID($invoiceId);
-        $failed_status_id =                     CRM_Core_PseudoConstant::getKey(
+        $redirect_thanx = TRUE;
+        $failed_status_id = CRM_Core_PseudoConstant::getKey(
             'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Failed');;
-        $cancelled_status_id =                     CRM_Core_PseudoConstant::getKey(
+        $cancelled_status_id = CRM_Core_PseudoConstant::getKey(
             'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Cancelled');;
-        $pending_status_id =                     CRM_Core_PseudoConstant::getKey(
+        $pending_status_id = CRM_Core_PseudoConstant::getKey(
             'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Pending');
-        if(in_array($contribution['contribution_status_id'], [$failed_status_id, $cancelled_status_id])){
+        if (in_array($contribution['contribution_status_id'], [$failed_status_id, $cancelled_status_id])) {
             self::changeContributionStatusViaDB($invoiceId, $pending_status_id);
             //to give possibility to make it fulfiled
         }
@@ -1303,11 +1319,21 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         } catch (CiviCRM_API3_Exception $e) {
             if (!stristr($e->getMessage(), 'Contribution already completed')) {
                 Civi::log()->debug("2c2p IPN Error Updating contribution: " . $e->getMessage());
-                CRM_Utils_System::redirect($failureUrl);
+                if ($redirect === TRUE) {
+                    $redirect_thanx = FALSE;
+                }
             }
+//            throw $e;
         }
-        CRM_Utils_System::redirect($thanxUrl);
-
+        if ($redirect === TRUE) {
+            if ($redirect_thanx === TRUE) {
+                $redirect_url = self::getThanxUrlViaInvoiceID($invoiceId);
+            }
+            if ($redirect_thanx === FALSE) {
+                $redirect_url = self::getFailureUrlViaInvoiceID($invoiceId);
+            }
+            CRM_Utils_System::redirect($redirect_url);
+        }
         //        CRM_Core_DAO::executeQuery($query);
     }
 
@@ -1317,8 +1343,6 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      */
     public static function setContributionStatusCancelled($contributionId): void
     {
-
-
         //todo recieve only payment
         $contributionParams = [
             'options' => ['limit' => 1, 'sort' => 'id DESC'],
@@ -1328,10 +1352,32 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $contribution = civicrm_api3('Contribution', 'get', $contributionParams)['values'];
         $contribution = reset($contribution);
 //        CRM_Core_Error::debug_var('contribution', $contribution);
-//        $decodedTokenResponse = self::getPaymentInquiryViaPaymentToken($invoiceId);
         $invoiceId = $contribution["invoice_id"];
-        $cancelledTokenResponse = self::setPaymentInquiryViaKeySignature($invoiceId, "V");
-//        CRM_Core_Error::debug_var('decodedTokenResponse', $cancelledTokenResponse);
+        CRM_Core_Error::debug_var('gotcontribution', date("Y-m-d H:i:s"));
+        $decodedTokenResponse = self::getPaymentInquiryViaKeySignature($invoiceId);
+//        CRM_Core_Error::debug_var('decodedTokenResponseStatus', $decodedTokenResponse['status']);
+        CRM_Core_Error::debug_var('gotdecodedTokenResponseStatus', date("Y-m-d H:i:s"));
+        if ($decodedTokenResponse['status'] == "A") {
+            $cancelledTokenResponse = self::setPaymentInquiryViaKeySignature($invoiceId, "V");
+        }
+        if ($decodedTokenResponse['status'] == "S") {
+            $decodedTokenResponse = self::getPaymentInquiryViaKeySignature($invoiceId, "RS");
+            if($decodedTokenResponse['status'] == "S") {
+                if ($decodedTokenResponse['respDesc'] == "No refund records") {
+                    $amount = strval($decodedTokenResponse["amount"]);
+                    $cancelledTokenResponse = self::setPaymentInquiryViaKeySignature($invoiceId, "R", $amount);
+                }
+                if ($decodedTokenResponse['respDesc'] != "No refund records") {
+//                    CRM_Core_Error::debug_var('decodedRFTokenResponse', $decodedTokenResponse);
+                    CRM_Core_Error::debug_var('gotdecodedRFTokenResponse', date("Y-m-d H:i:s"));
+                }
+            }
+            if ($decodedTokenResponse['status'] != "S") {
+//                CRM_Core_Error::debug_var('decodedNonSRFTokenResponse', $decodedTokenResponse);
+                CRM_Core_Error::debug_var('gotdecodedNonSRFTokenResponse', date("Y-m-d H:i:s"));
+            }
+        }
+        CRM_Core_Error::debug_var('setPaymentStatus', date("Y-m-d H:i:s"));
     }
 
     /**
@@ -1429,6 +1475,10 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         }
     }
 
+    /**
+     * @throws CRM_Core_Exception
+     * @throws CiviCRM_API3_Exception
+     */
     public static function checkPendingContribution()
     {
 
@@ -1439,21 +1489,21 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $invoiceId = CRM_Utils_Request::retrieveValue('invoiceId', 'String', null);
 //        CRM_Core_Error::debug_var('invoiceId', $invoiceId);
         if ($invoiceId) {
-            try {
+//            try {
 //                CRM_Core_Error::debug_var('before', $invoiceId);
-                self::setRecievedContributionStatus($invoiceId);
+            self::setRecievedContributionStatus($invoiceId);
 //            CRM_Core_Error::debug_var('after', $invoiceId);
-            } catch (Exception $e) {
-                CRM_Core_Error::debug_var('error', $e->getMessage());
-                CRM_Core_Error::statusBounce("Operation Failed", null, '2c2p');
-            }
+//            } catch (Exception $e) {
+//                CRM_Core_Error::debug_var('error', $e->getMessage());
+//                CRM_Core_Error::statusBounce("Operation Failed", null, '2c2p');
+//            }
         } else {
             CRM_Core_Error::statusBounce("No Invoice ID", null, '2c2p');
         }
     }
 
     /**
-     * @param $response
+     * @param $response_body_contents
      * @param $path_to_2c2p_certificate
      * @param $path_to_merchant_pem
      * @param $merchant_password
@@ -1461,7 +1511,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      * @throws CRM_Core_Exception
      */
 
-    public static function getPaymentFrom2c2pResponse($response,
+    public static function getPaymentFrom2c2pResponse($response_body_contents,
                                                       $path_to_2c2p_certificate,
                                                       $path_to_merchant_pem,
                                                       $merchant_password,
@@ -1484,7 +1534,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $secretKey = $merchant_secret;    //Get SecretKey from 2C2P PGW Dashboard
 //end credentials part
 
-        $response_body = $response->getBody()->getContents();
+        $response_body = $response_body_contents;
 
         $signatureAlgorithmManager = new \Jose\Component\Core\AlgorithmManager([
             new \Jose\Component\Signature\Algorithm\PS256(),
@@ -1511,27 +1561,30 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             ]
         );
 
-        try {
-            $jw_signed_response = $signature_serializer->unserialize($response_body);
-            $isVerified = $jwsVerifier->verifyWithKey($jw_signed_response, $receiverPublicCertKey, 0);
-            if ($isVerified) {
+//        try {
+//        CRM_Core_Error::debug_var('response_body', $response_body);
+//        CRM_Core_Error::debug_var('receiverPublicCertKey', $receiverPublicCertKey);
+        $jw_signed_response = $signature_serializer->unserialize($response_body);
+//        CRM_Core_Error::debug_var('jw_signed_response', $jw_signed_response);
+        $isVerified = $jwsVerifier->verifyWithKey($jw_signed_response, $receiverPublicCertKey, 0);
+        if ($isVerified) {
 
-                $jwsLoader = new \Jose\Component\Signature\JWSLoader(
-                    $signatureSerializerManager,
-                    $jwsVerifier,
-                    $headerSignatureCheckerManager
-                );
+            $jwsLoader = new \Jose\Component\Signature\JWSLoader(
+                $signatureSerializerManager,
+                $jwsVerifier,
+                $headerSignatureCheckerManager
+            );
 
-                $jwsigned_response_loaded = $jwsLoader->loadAndVerifyWithKey((string)$response_body, $receiverPublicCertKey, $signature, null);
-                $encrypted_serialized_response = $jwsigned_response_loaded->getPayload();
-            } else {
-                throw new CRM_Core_Exception(ts("2c2p Error: Not Verified "));
-            }
-
-        } catch (Exception $e) {
-            $em = $e->getMessage();
-            throw new CRM_Core_Exception(ts("2c2p Error: $em "));
+            $jwsigned_response_loaded = $jwsLoader->loadAndVerifyWithKey((string)$response_body, $receiverPublicCertKey, $signature, null);
+            $encrypted_serialized_response = $jwsigned_response_loaded->getPayload();
+        } else {
+            throw new CRM_Core_Exception(ts("2c2p Error: Not Verified "));
         }
+
+//        } catch (Exception $e) {
+//            $em = $e->getMessage();
+//            throw new CRM_Core_Exception(ts("2c2p Error: $em "));
+//        }
 
 
         $encryption_serializer = new \Jose\Component\Encryption\Serializer\CompactSerializer(); // The serializer
@@ -1590,7 +1643,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         } catch (Exception $e) {
             throw new CRM_Core_Exception(ts('2c2p - JWE Error'));
         }
-        echo $unencrypted_payload;
+//        echo $unencrypted_payload;
 //        if($request_type == "RecurringMaintenanceRequest"){
 //        $answer = self::unencryptRecurringPaymentAnswer($unencrypted_payload, $secretKey);
 //        }
@@ -1608,7 +1661,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     public static function getPaymentResponseViaKeySignature(
         array $payment_inquiry): \Psr\Http\Message\ResponseInterface
     {
-        CRM_Core_Error::debug_var('payment_inquiry', $payment_inquiry);
+//        CRM_Core_Error::debug_var('payment_inquiry', $payment_inquiry);
 
         $invoiceId = $payment_inquiry['invoiceNo'];
 
@@ -1623,17 +1676,17 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //        $url = $paymentProcessor->url_site . '/payment/4.1/paymentInquiry';
         $url = "https://demo2.2c2p.com/2C2PFrontend/PaymentAction/2.0/action";
 // The key encryption algorithm manager with the A256KW algorithm.
-        CRM_Core_Error::debug_var('keyEncryptionAlgorithmManager', '0');
-        CRM_Core_Error::debug_var('keyEncryptionAlgorithmManager', '1');
+//        CRM_Core_Error::debug_var('keyEncryptionAlgorithmManager', '0');
+//        CRM_Core_Error::debug_var('keyEncryptionAlgorithmManager', '1');
         try {
             $keyEncryptionAlgorithmManager = new \Jose\Component\Core\AlgorithmManager([
                 new \Jose\Component\Encryption\Algorithm\KeyEncryption\RSAOAEP(),
             ]);
-            CRM_Core_Error::debug_var('keyEncryptionAlgorithmManager', $keyEncryptionAlgorithmManager->list());
+//            CRM_Core_Error::debug_var('keyEncryptionAlgorithmManager', $keyEncryptionAlgorithmManager->list());
         } catch (CRM_Core_Exception $e) {
             throw new CRM_Core_Exception(ts('2c2p - Unvalid keyEncryptionAlgorithmManager') . $e->getMessage());
         }
-        CRM_Core_Error::debug_var('keyEncryptionAlgorithmManager', '1');
+//        CRM_Core_Error::debug_var('keyEncryptionAlgorithmManager', '1');
 
 // The content encryption algorithm manager with the A256CBC-HS256 algorithm.
         try {
@@ -1643,7 +1696,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         } catch (CRM_Core_Exception $e) {
             throw new CRM_Core_Exception(ts('2c2p - Unvalid contentEncryptionAlgorithmManager') . $e->getMessage());
         }
-        CRM_Core_Error::debug_var('contentEncryptionAlgorithmManager', '2');
+//        CRM_Core_Error::debug_var('contentEncryptionAlgorithmManager', '2');
 
 // The compression method manager with the DEF (Deflate) method.
         $compressionMethodManager = new \Jose\Component\Encryption\Compression\CompressionMethodManager([
@@ -1676,7 +1729,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $stringXML = $stringXML . "<hashValue>$hashone</hashValue>";
         $stringXML = $stringXML . "\n</" . $payment_inquiry["request_type"] . ">";
         $xml = $stringXML;
-        CRM_Core_Error::debug_var('xml', $xml);
+//        CRM_Core_Error::debug_var('xml', $xml);
 
 
 //return;
@@ -1738,7 +1791,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             ]);
 
         } catch (GuzzleHttp\Exception\GuzzleException $e) {
-            print("\n2:\n" . $e->getMessage());
+            CRM_Core_Error::debug_var('guzzle_error', "\n2:\n" . $e->getMessage());
         }
         return $response;
     }

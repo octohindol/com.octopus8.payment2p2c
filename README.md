@@ -106,3 +106,5 @@ define( 'CIVICRM_UF_BASEURL'      , 'https://########.ngrok.io');
 
 - 0.1.22 beta - Cancelling transaction via Update status from 2c2p
    refunds payments in CiviCRM system
+
+- 0.1.24 Checking cancelled transactions - lots of logging
