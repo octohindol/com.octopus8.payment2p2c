@@ -789,7 +789,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $paymentProcessor = self::getPaymentProcessorViaProcessorID($paymentProcessorId);
         $payment_processor_array = $paymentProcessor->_paymentProcessor;
         $thanxUrl = strval($payment_processor_array['subject']);
-        CRM_Core_Error::debug_var('$payment_processor_array_thanx', $payment_processor_array);
+//        CRM_Core_Error::debug_var('$payment_processor_array_thanx', $payment_processor_array);
         if ($thanxUrl == null || $thanxUrl == "") {
             $thanxUrl = CRM_Utils_System::url();
 //            CRM_Core_Error::debug_var('thanxUrl1', $thanxUrl);
@@ -809,7 +809,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $paymentProcessor = self::getPaymentProcessorViaProcessorID($paymentProcessorId);
 
         $payment_processor_array = $paymentProcessor->_paymentProcessor;
-        CRM_Core_Error::debug_var('$payment_processor_array_failure', $payment_processor_array);
+//        CRM_Core_Error::debug_var('$payment_processor_array_failure', $payment_processor_array);
         $failureUrl = strval($payment_processor_array['signature']);
         if ($failureUrl == null || $failureUrl == "") {
             $failureUrl = CRM_Utils_System::url();
@@ -1177,8 +1177,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             self::setRecievedContributionStatus($invoiceId);
         }
         if ($destination == "front") {
-            CRM_Core_Error::debug_var('destination', $destination);
-            CRM_Core_Error::debug_var('invoiceId', $invoiceId);
+//            CRM_Core_Error::debug_var('destination', $destination);
+//            CRM_Core_Error::debug_var('invoiceId', $invoiceId);
             $failureUrl = self::getFailureUrlViaInvoiceID($invoiceId);
             $redirectUrl = $failureUrl;
             try {
@@ -1186,14 +1186,14 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             } catch (CRM_Core_Exception $e) {
                 CRM_Core_Error::debug_var('ErrorgetContributionByInvoiceId', $e->getMessage());
             }
-            CRM_Core_Error::debug_var('redirectUrl1', $redirectUrl);
+//            CRM_Core_Error::debug_var('redirectUrl1', $redirectUrl);
             //            CRM_Core_Error::debug_var('contribution', $contribution);
             $encodedPaymentResponse = $params['paymentResponse'];
             $paymentResponse = $this->decodePayload64($encodedPaymentResponse);
 //            CRM_Core_Error::debug_var('paymentResponse', $paymentResponse);
-            CRM_Core_Error::debug_var('redirectUrl2', $redirectUrl);
+//            CRM_Core_Error::debug_var('redirectUrl2', $redirectUrl);
             $module = CRM_Utils_Array::value('md', $params);
-            CRM_Core_Error::debug_var('respCode', $paymentResponse['respCode']);
+//            CRM_Core_Error::debug_var('respCode', $paymentResponse['respCode']);
             switch ($module) {
                 case 'contribute':
                     if ($paymentResponse['respCode'] == 2000) {
@@ -1219,7 +1219,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                 default:
                     CRM_Core_Error::statusBounce("Could not get module name from request thanxUrl", $redirectUrl);
             }
-            CRM_Core_Error::debug_var('redirectUrl5', $redirectUrl);
+//            CRM_Core_Error::debug_var('redirectUrl5', $redirectUrl);
             CRM_Utils_System::redirect($redirectUrl);
 
 //        $thanxUrl = CRM_Utils_System::thanxUrl($this->_paymentProcessor['subject']);
@@ -1245,8 +1245,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $paymentInquery = self::getPaymentInquiryViaPaymentToken($invoiceId);
         if (array_key_exists('respCode', $paymentInquery)) {
             $resp_code = $paymentInquery['respCode'];
-            $resp_code = $paymentInquery['respCode'];
-            CRM_Core_Error::debug_var('paymentInquery', $paymentInquery);
+//            CRM_Core_Error::debug_var('paymentInquery', $paymentInquery);
 
             if ($resp_code === "0000") {
                 return $thanxUrl;
@@ -1406,7 +1405,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             self::saveRecurringTokenValue($invoiceId, $decodedTokenResponse);
         }
         $resp_code = strval($decodedTokenResponse['respCode']);
-        CRM_Core_Error::debug_var('decodedTokenResponse', $decodedTokenResponse);
+//        CRM_Core_Error::debug_var('decodedTokenResponse', $decodedTokenResponse);
 
         //        CRM_Core_Error::debug_var('resp_code', $resp_code);
         if ($resp_code == "15") {
@@ -1630,7 +1629,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 
 //        CRM_Core_Error::debug_var('request', $_REQUEST);
 //        CRM_Core_Error::debug_var('post', $_POST);
-        CRM_Core_Error::debug_var('started_checking_pending', date("Y-m-d H:i:s"));
+//        CRM_Core_Error::debug_var('started_checking_pending', date("Y-m-d H:i:s"));
 //        CRM_Core_Error::statusBounce(date("Y-m-d H:i:s"), null, '2c2p');
         $invoiceId = null;
         $invoiceId = CRM_Utils_Request::retrieveValue('invoiceId', 'String', null);
@@ -1647,7 +1646,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         } else {
             CRM_Core_Error::statusBounce("No Invoice ID", null, '2c2p');
         }
-        CRM_Core_Error::debug_var('ended_checking_pending', date("Y-m-d H:i:s"));
+//        CRM_Core_Error::debug_var('ended_checking_pending', date("Y-m-d H:i:s"));
     }
 
     /**
