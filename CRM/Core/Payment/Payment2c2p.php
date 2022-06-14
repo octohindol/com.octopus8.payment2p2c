@@ -386,6 +386,24 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     /**
      * @param $invoiceId
      * @param array $decodedTokenResponse
+     */
+    private static function saveRecurringTokenValue($invoiceId, array $decodedTokenResponse): void
+    {
+        $tranRef = $decodedTokenResponse['tranRef'];
+        $recurringUniqueID = $decodedTokenResponse['recurringUniqueID'];
+        $referenceNo = $decodedTokenResponse['referenceNo'];
+
+        $query = "UPDATE civicrm_payment_token SET 
+                                billing_first_name='$recurringUniqueID',
+                                 billing_middle_name='$tranRef',
+                                 billing_last_name='$referenceNo'
+                      where masked_account_number='$invoiceId'";
+        CRM_Core_DAO::executeQuery($query);
+    }
+
+    /**
+     * @param $invoiceId
+     * @param array $decodedTokenResponse
      * @param $contribution
      * @param $trxnId
      * @throws CRM_Core_Exception
@@ -1241,6 +1259,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             if ($resp_code == "2001") {
                 return $thanxUrl;
             }
+            self::setRecievedContributionStatus($invoiceId);
         }
         return $failureUrl;
     }
@@ -1380,17 +1399,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 
         if ($contribution['contribution_recur_id'] != null) {
 //        CRM_Core_Error::debug_var('url', $url);
-            $resp_code = $decodedTokenResponse['respCode'];
-            $tranRef = $decodedTokenResponse['tranRef'];
-            $recurringUniqueID = $decodedTokenResponse['recurringUniqueID'];
-            $referenceNo = $decodedTokenResponse['referenceNo'];
-
-            $query = "UPDATE civicrm_payment_token SET 
-                                billing_first_name='$recurringUniqueID',
-                                 billing_middle_name='$tranRef',
-                                 billing_last_name='$referenceNo'
-                      where masked_account_number='$invoiceId'";
-            CRM_Core_DAO::executeQuery($query);
+            self::saveRecurringTokenValue($invoiceId, $decodedTokenResponse);
         }
         $resp_code = strval($decodedTokenResponse['respCode']);
         CRM_Core_Error::debug_var('decodedTokenResponse', $decodedTokenResponse);
