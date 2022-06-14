@@ -563,15 +563,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      */
     protected static function getPaymentProcessorViaProcessorID($paymentProcessorId): CRM_Core_Payment_Payment2c2p
     {
-//        try {
-//            $paymentProcessor = new CRM_Financial_DAO_PaymentProcessor();
-//            $paymentProcessor->id = $paymentProcessorId;
-//            $paymentProcessor->find(TRUE);
-//        } catch (CiviCRM_API3_Exception $e) {
-//            CRM_Core_Error::debug_var('API error', $e->getMessage());
-//            throw new CRM_Core_Exception(ts('2c2p - Could not find payment processor'));
-//        }
-//        return (CRM_Core_Payment_Payment2c2p) $paymentProcessor;
+
         $paymentProcessorInfo = civicrm_api3('PaymentProcessor', 'get', [
             'id' => $paymentProcessorId,
             'sequential' => 1,
@@ -616,7 +608,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $paymentToken = $payment_token['token'];
         $paymentProcessorId = $payment_token['payment_processor_id'];
         $paymentProcessor = self::getPaymentProcessorViaProcessorID($paymentProcessorId);
-        $url = $paymentProcessor->url_site . '/payment/4.1/paymentInquiry';
+        $payment_processor_array = $paymentProcessor->_paymentProcessor;
+        $url = $payment_processor_array['url_site'] . '/payment/4.1/paymentInquiry';
         $secretkey = $paymentProcessor->password;
         $merchantID = $paymentProcessor->user_name;
         $payload = array(
@@ -774,9 +767,11 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      */
     private static function getThanxUrlViaInvoiceID($invoiceID): string
     {
-        $paymentProcessor = self::getPaymentProcessorIdViaInvoiceID($invoiceID);
+        $paymentProcessorId = self::getPaymentProcessorIdViaInvoiceID($invoiceID);
+        $paymentProcessor = self::getPaymentProcessorViaProcessorID($paymentProcessorId);
         $payment_processor_array = $paymentProcessor->_paymentProcessor;
         $thanxUrl = strval($payment_processor_array['subject']);
+        CRM_Core_Error::debug_var('$payment_processor_array_thanx', $payment_processor_array);
         if ($thanxUrl == null || $thanxUrl == "") {
             $thanxUrl = CRM_Utils_System::url();
 //            CRM_Core_Error::debug_var('thanxUrl1', $thanxUrl);
@@ -792,8 +787,11 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     private static function getFailureUrlViaInvoiceID($invoiceID): string
     {
 
-        $paymentProcessor = self::getPaymentProcessorIdViaInvoiceID($invoiceID);
+        $paymentProcessorId = self::getPaymentProcessorIdViaInvoiceID($invoiceID);
+        $paymentProcessor = self::getPaymentProcessorViaProcessorID($paymentProcessorId);
+
         $payment_processor_array = $paymentProcessor->_paymentProcessor;
+        CRM_Core_Error::debug_var('$payment_processor_array_failure', $payment_processor_array);
         $failureUrl = strval($payment_processor_array['signature']);
         if ($failureUrl == null || $failureUrl == "") {
             $failureUrl = CRM_Utils_System::url();
