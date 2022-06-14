@@ -628,8 +628,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $paymentProcessor = self::getPaymentProcessorViaProcessorID($paymentProcessorId);
         $payment_processor_array = $paymentProcessor->_paymentProcessor;
         $url = $payment_processor_array['url_site'] . '/payment/4.1/paymentInquiry';
-        $secretkey = $paymentProcessor->password;
-        $merchantID = $paymentProcessor->user_name;
+        $secretkey = $payment_processor_array['password'];
+        $merchantID = $payment_processor_array['user_name'];
         $payload = array(
             "paymentToken" => $paymentToken,
             "merchantID" => $merchantID,
@@ -1245,7 +1245,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $paymentInquery = self::getPaymentInquiryViaPaymentToken($invoiceId);
         if (array_key_exists('respCode', $paymentInquery)) {
             $resp_code = $paymentInquery['respCode'];
-//        CRM_Core_Error::debug_var('resp_code', $resp_code);
+            $resp_code = $paymentInquery['respCode'];
+            CRM_Core_Error::debug_var('paymentInquery', $paymentInquery);
 
             if ($resp_code === "0000") {
                 return $thanxUrl;
