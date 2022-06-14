@@ -1251,16 +1251,19 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                 return $thanxUrl;
             }
             if ($resp_code == "0003") {
+                self::setRecievedContributionStatus($invoiceId);
                 return $failureUrl;
             }
             if ($resp_code == "0001") {
+                self::setRecievedContributionStatus($invoiceId);
                 return $failureUrl;
             }
             if ($resp_code == "2001") {
+                self::setRecievedContributionStatus($invoiceId);
                 return $thanxUrl;
             }
-            self::setRecievedContributionStatus($invoiceId);
         }
+        self::setRecievedContributionStatus($invoiceId);
         return $failureUrl;
     }
 
