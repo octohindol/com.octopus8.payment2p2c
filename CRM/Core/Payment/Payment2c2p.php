@@ -1,11 +1,11 @@
 <?php
 /*
    +----------------------------------------------------------------------------+
-   | Payflow Pro Core Payment Module for CiviCRM version 5                      |
+   | 2c2p Core Payment Module for CiviCRM version 5                      |
    +----------------------------------------------------------------------------+
    | Licensed to CiviCRM under the Academic Free License version 3.0            |
    |                                                                            |
-   | Written & Contributed by Eileen McNaughton - 2009                          |
+   | Written & Contributed by Octopus8                                          |
    +---------------------------------------------------------------------------+
   */
 
@@ -453,8 +453,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 
     /**
      * @param $invoiceId
-     * @return mixed
-     * @throws CRM_Core_Exception
+     * @return array|int|mixed
+     * @throws CiviCRM_API3_Exception
      */
     private static function getContributionByInvoiceId($invoiceId)
     {
@@ -568,9 +568,16 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      */
     protected static function getPaymentProcessorIdViaInvoiceID($invoiceId)
     {
+        try{
         $payment_token = self::getPaymentTokenViaInvoiceID($invoiceId);
         $paymentProcessorId = $payment_token['payment_processor_id'];
-        return $paymentProcessorId;
+            return $paymentProcessorId;
+
+        }catch (CRM_Core_Exception $e) {
+            $pP = self::getPaymentProcessorViaProcessorName('Payment2c2p');
+            $pp = $pP->_paymentProcessor;
+            return $pp['id'];
+        }
     }
 
     /**
@@ -585,6 +592,23 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $paymentProcessorInfo = civicrm_api3('PaymentProcessor', 'get', [
             'id' => $paymentProcessorId,
             'sequential' => 1,
+        ]);
+        $paymentProcessorInfo = $paymentProcessorInfo['values'];
+        if (count($paymentProcessorInfo) <= 0) {
+            return NULL;
+        }
+        $paymentProcessorInfo = $paymentProcessorInfo[0];
+        $paymentProcessor = new CRM_Core_Payment_Payment2c2p(($paymentProcessorInfo['is_test']) ? 'test' : 'live', $paymentProcessorInfo);
+        return $paymentProcessor;
+    }
+
+    protected static function getPaymentProcessorViaProcessorName($paymentProcessorName): CRM_Core_Payment_Payment2c2p
+    {
+
+        $paymentProcessorInfo = civicrm_api3('PaymentProcessor', 'get', [
+            'name' => $paymentProcessorName,
+            'sequential' => 1,
+            'options' => ['limit' => 1, 'sort' => 'id DESC'],
         ]);
         $paymentProcessorInfo = $paymentProcessorInfo['values'];
         if (count($paymentProcessorInfo) <= 0) {
@@ -648,9 +672,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
      */
     public static function getPaymentInquiryViaKeySignature($invoiceID, $processType = "I"): array
     {
-        $paymentProcessorId = self::getPaymentProcessorIdViaInvoiceID($invoiceID);
-        $paymentProcessor = self::getPaymentProcessorViaProcessorID($paymentProcessorId);
 
+        $paymentProcessor = self::getPaymentProcessorViaProcessorName('Payment2c2p');
         $payment_processor = $paymentProcessor->_paymentProcessor;
         $merchant_id = $payment_processor['user_name'];
         $merchant_secret = $payment_processor['password'];
@@ -667,13 +690,15 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             'actionAmount' => "",
             'request_type' => "PaymentProcessRequest"
         );
-//        CRM_Core_Error::debug_var('payment_inquiry', $payment_inquiry);
+
+        CRM_Core_Error::debug_var('payment_inquiry', $payment_inquiry);
 
         $response = self::getPaymentResponseViaKeySignature(
             $payment_inquiry,
             );
         $response_body_contents = $response->getBody()->getContents();
-//        CRM_Core_Error::debug_var('response_body_contents_before', $response_body_contents);
+
+        CRM_Core_Error::debug_var('response_body_contents_before', $response_body_contents);
         $path_to_2c2p_certificate = $paymentProcessor->getOpenCertificatePath();
         $path_to_merchant_pem = $paymentProcessor->getClosedCertificatePath();
         $merchant_password = $paymentProcessor->getClosedCertificatePwd();
@@ -683,7 +708,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                 $path_to_merchant_pem,
                 $merchant_password,
                 $merchant_secret);
-//        CRM_Core_Error::debug_var('answer', $answer);
+        CRM_Core_Error::debug_var('answer', $answer);
 
         return $answer;
     }
@@ -835,11 +860,6 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $this->guzzleClient = $guzzleClient;
     }
 
-    /*
-     * This function  sends request and receives response from
-     * the processor. It is the main function for processing on-server
-     * credit card transactions
-     */
 
 
     /**
@@ -965,10 +985,13 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     }
 
     /**
+     * @param array|\Civi\Payment\PropertyBag $params
+     * @param string $component
+     * @return array|mixed
      * @throws CRM_Core_Exception
+     * @throws CiviCRM_API3_Exception
      */
-    public
-    function doPayment(&$params, $component = 'contribute')
+    public function doPayment(&$params, $component = 'contribute')
     {
         $this->_component = $component;
 //        CRM_Core_Error::debug_var('params_before', $params);
@@ -1730,8 +1753,12 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                 $jwsVerifier,
                 $headerSignatureCheckerManager
             );
-
+            try {
             $jwsigned_response_loaded = $jwsLoader->loadAndVerifyWithKey((string)$response_body, $receiverPublicCertKey, $signature, null);
+            } catch (Exception $e) {
+                throw new CRM_Core_Exception("2c2p Error: " . $e->getMessage());
+
+            }
             $encrypted_serialized_response = $jwsigned_response_loaded->getPayload();
         } else {
             throw new CRM_Core_Exception(ts("2c2p Error: Not Verified "));
@@ -1778,7 +1805,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
             );
 
             $success = $jweDecrypter->decryptUsingKey($jw_encrypted_response, $jw_signature_key, 0);
-//            CRM_Core_Error::debug_var('success_within_getPaymentFrom2c2pResponse', $success);
+            CRM_Core_Error::debug_var('success_within_getPaymentFrom2c2pResponse: ', strval($success));
 
             $jweLoader = new JWELoader(
                 $encryptionSerializerManager,
@@ -1873,7 +1900,8 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $stringXML = $stringXML . "<hashValue>$hashone</hashValue>";
         $stringXML = $stringXML . "\n</" . $payment_inquiry["request_type"] . ">";
         $xml = $stringXML;
-        //CRM_Core_Error::debug_var('xml', $xml);
+
+        CRM_Core_Error::debug_var('xml', $xml);
 
         $jw_encrypted_response = $jwencryptedBuilder
             ->create()// We want to create a new JWE

@@ -26,12 +26,12 @@ $path_to_merchant_pem = $path . DIRECTORY_SEPARATOR . "includes" . DIRECTORY_SEP
 $merchant_password = "octopus8"; //private key password
 $merchant_secret = "2FC22F51DBF485FC7821005B9BAF98BE609D28BAE12977039D59FB991B42B999";    //Get SecretKey from 2C2P PGW Dashboard
 $merchant_id = "702702000001066";        //Get MerchantID when opening account with 2C2P
-$date = date('Y-m-d');
+$date = date('Y-m-d h:i:s');
 $time_stamp = date('dmyhis', strtotime($date) . ' +1 day');
 //print("\n$time_stamp\n");
 //inquery
 
-$invoiceNo = "9915d5b87e54e9cc7e7f0cc9cfa1c967";
+$invoiceNo = "b024e3553a8c8745dc20f04ca8de6105";
 
 //$payment_inquiry = array (
 //    'request_type' => 'RecurringMaintenanceRequest',
