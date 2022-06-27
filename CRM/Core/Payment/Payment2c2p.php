@@ -39,13 +39,13 @@ use Jose\Component\Signature\{
 
 $autoload = __DIR__ . '/vendor/autoload.php';
 if (file_exists($autoload)) {
-    CRM_Core_Error::debug_var('autoload1', $autoload);
+//    CRM_Core_Error::debug_var('autoload1', $autoload);
     require_once $autoload;
 } else {
     $autoload = E::path() . '/vendor/autoload.php';
     if (file_exists($autoload)) {
         require_once $autoload;
-        CRM_Core_Error::debug_var('autoload2', $autoload);
+//        CRM_Core_Error::debug_var('autoload2', $autoload);
     }
 }
 
@@ -422,12 +422,12 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //        CRM_Core_Error::debug_var('contribution_status_id', "SUPER");
         $contributionId = $contribution['id'];
         $paymentProcessorId = self::getPaymentProcessorIdViaInvoiceID($invoiceId);
-        $failed_status_id = CRM_Core_PseudoConstant::getKey(
-            'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Failed');;
-        $cancelled_status_id = CRM_Core_PseudoConstant::getKey(
-            'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Cancelled');;
-        $pending_status_id = CRM_Core_PseudoConstant::getKey(
-            'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Pending');
+        $failed_status_id = self::contribution_status_id("Failed");
+        //CRM_Core_PseudoConstant::getKey(
+        //            'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Failed');
+        //
+        $cancelled_status_id = self::contribution_status_id('Cancelled');
+        $pending_status_id = self::contribution_status_id('Pending');
         if (in_array($contribution['contribution_status_id'], [$failed_status_id, $cancelled_status_id])) {
             self::changeContributionStatusViaDB($invoiceId, $pending_status_id);
             //to give possibility to make it fulfiled
@@ -978,11 +978,11 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         return parent::buildForm($form);
     }
 
-    public function doRefund(&$params)
-    {
-        CRM_Core_Error::debug_var('refund_params', $params);
-//        return parent::doRefund($params);
-    }
+//    public function doRefund(&$params)
+//    {
+//        CRM_Core_Error::debug_var('refund_params', $params);
+////        return parent::doRefund($params);
+//    }
 
     /**
      * @param array|\Civi\Payment\PropertyBag $params
@@ -1443,10 +1443,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 //        CRM_Core_Error::debug_var('contribution_status', $contribution_status);
         if ($decodedTokenResponse['status'] == "S") {
             if ($decodedTokenResponse['respDesc'] != "No refund records") {
-                $pending_status = CRM_Core_PseudoConstant::getKey(
-                    'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Pending');
-//                CRM_Core_Error::debug_var('contribution_status', $contribution['contribution_status_id']);
-//                CRM_Core_Error::debug_var('Pending', $pending_status);
+                $pending_status = self::contribution_status_id('Pending');
                 if ($contribution['contribution_status_id'] == $pending_status) {
                     self::setContributionStatusCompleted($invoiceId, $decodedTokenResponse, $contribution, $trxnId);
                 }
@@ -1468,15 +1465,13 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
                 "ROE",
                 "EX",
                 "CTF"])) {
-                $failed_status_id = CRM_Core_PseudoConstant::getKey(
-                    'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Failed');
+                $failed_status_id = self::contribution_status_id('Failed');
                 self::changeContributionStatusViaDB($invoiceId, $failed_status_id);
                 return;
             }
 
             if ($contribution_status == "RF") {
-                $pending_status = CRM_Core_PseudoConstant::getKey(
-                    'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Pending');
+                $pending_status = self::contribution_status_id('Pending');
                 if ($contribution['contribution_status_id'] == $pending_status) {
                     self::setContributionStatusCompleted($invoiceId, $decodedTokenResponse, $contribution, $trxnId);
                 }
@@ -1485,15 +1480,13 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
 
             if (in_array($contribution_status, ["AP", "RP", "VP"])) {
                 $contribution_status_id =
-                    CRM_Core_PseudoConstant::getKey(
-                        'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Pending');
+                    self::contribution_status_id('Pending');
                 self::changeContributionStatusViaDB($invoiceId, $contribution_status_id);
             }
 
             if ($contribution_status == "RS") {
                 $contribution_status_id =
-                    CRM_Core_PseudoConstant::getKey(
-                        'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'In Progress');
+                    self::contribution_status_id('In Progress');
                 self::changeContributionStatusViaDB($invoiceId, $contribution_status_id);
             }
 
@@ -1998,6 +1991,29 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         return self::CLOSED_CERTIFICATE_PWD;
     }
 
+    /**
+     * @param $name
+     * @return int|string|null
+     */
+    public static function contribution_status_id($name) {
+        return CRM_Utils_Array::key($name, \CRM_Contribute_PseudoConstant::contributionStatus(NULL, 'name'));
+    }
 
+
+    /**
+     * Get the path of a resource file (in this extension).
+     *
+     * @param string|NULL $file
+     *   Ex: NULL.
+     *   Ex: 'css/foo.css'.
+     *
+     * @return string
+     *   Ex: '/var/www/example.org/sites/default/ext/org.example.foo'.
+     *   Ex: '/var/www/example.org/sites/default/ext/org.example.foo/css/foo.css'.
+     */
+    public static function extensionPath($file = NULL) {
+        // return CRM_Core_Resources::singleton()->getPath(self::LONG_NAME, $file);
+        return __DIR__ . ($file === NULL ? '' : (DIRECTORY_SEPARATOR . $file));
+    }
 }
 
