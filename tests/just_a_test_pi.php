@@ -55,13 +55,13 @@ $recurringUniqueID = "4992455";
 //            'chargeOnDate' => '',
 //);
 
-$response = CRM_Core_Payment_Payment2c2p::getPaymentInquiryViaKeySignature(
-    $invoiceNo,
-    $processType,
-    $request_type,
-    $version,
-    $recurringUniqueID
-);
+//$response = CRM_Core_Payment_Payment2c2p::getPaymentInquiryViaKeySignature(
+//    $invoiceNo,
+//    $processType,
+//    $request_type,
+//    $version,
+//    $recurringUniqueID
+//);
 
 
 

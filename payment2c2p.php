@@ -258,7 +258,9 @@ function payment2c2p_civicrm_navigationMenu(&$menu)
  */
 function payment2c2p_civicrm_post($op, $objectName, $objectId, $objectRef)
 {
-//    CRM_Core_Error::debug_var('started_civicrm_post', date("Y-m-d H:i:s"));
+    CRM_Core_Error::debug_var('started_civicrm_post', date("Y-m-d H:i:s"));
+    CRM_Core_Error::debug_var('op', $op);
+    CRM_Core_Error::debug_var('objectName', $objectName);
     if ($op === 'edit' && $objectName === 'Contribution') {
         if (in_array(CRM_Core_PseudoConstant::getName('CRM_Contribute_BAO_Contribution',
             'contribution_status_id',
@@ -301,30 +303,4 @@ function payment2c2p_cancel_related_2c2p_record($objectId)
     CRM_Core_Payment_Payment2c2p::setCancelledContributionStatus($objectId);
     CRM_Core_Error::debug_var('ended', date("Y-m-d H:i:s"));
     return TRUE;
-}
-
-
-/**
- * @param $name
- * @return int|string|null
- */
-function _contribution_status_id($name) {
-    return CRM_Utils_Array::key($name, \CRM_Contribute_PseudoConstant::contributionStatus(NULL, 'name'));
-}
-
-
-/**
- * Get the path of a resource file (in this extension).
- *
- * @param string|NULL $file
- *   Ex: NULL.
- *   Ex: 'css/foo.css'.
- *
- * @return string
- *   Ex: '/var/www/example.org/sites/default/ext/org.example.foo'.
- *   Ex: '/var/www/example.org/sites/default/ext/org.example.foo/css/foo.css'.
- */
-function extensionPath($file = NULL) {
-    // return CRM_Core_Resources::singleton()->getPath(self::LONG_NAME, $file);
-    return __DIR__ . ($file === NULL ? '' : (DIRECTORY_SEPARATOR . $file));
 }
