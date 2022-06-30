@@ -55,7 +55,7 @@ $recurringUniqueID = "4992455";
 //            'chargeOnDate' => '',
 //);
 
-$response = CRM_Core_Payment_Payment2c2p::getPaymentInquiryViaKeySignature(
+$response = CRM_Payment2c2p_Utils::getPaymentInquiryViaKeySignature(
     $invoiceNo,
     $processType,
     $request_type,
