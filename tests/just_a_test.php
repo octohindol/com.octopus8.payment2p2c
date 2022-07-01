@@ -77,7 +77,7 @@ function printScheduledContributionsList(): void
 {
     $payment_processor = CRM_Payment2c2p_Utils::getPaymentProcessorViaProcessorName('Payment2c2p');
     $payment_processor_array = $payment_processor->getPaymentProcessor();
-    $response = CRM_Payment2c2p_Utils::get_scheduled_contributions($payment_processor_array);
+    $response = CRM_Payment2c2p_Utils::process_recurring_payments($payment_processor_array);
 
     print_r($response);
 }

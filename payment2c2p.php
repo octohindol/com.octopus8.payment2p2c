@@ -95,10 +95,10 @@ function payment2c2p_civicrm_upgrade($op, CRM_Queue_Queue $queue = NULL)
  *
  * @link https://docs.civicrm.org/dev/en/latest/hooks/hook_civicrm_managed
  */
-function payment2c2p_civicrm_managed(&$entities)
-{
-    _payment2c2p_civix_civicrm_managed($entities);
-}
+//function payment2c2p_civicrm_managed(&$entities)
+//{
+//    _payment2c2p_civix_civicrm_managed($entities);
+//}
 
 /**
  * Implements hook_civicrm_caseTypes().
@@ -306,3 +306,75 @@ function payment2c2p_cancel_related_2c2p_record($objectId)
     CRM_Core_Error::debug_var('ended_canceling_related', date("Y-m-d H:i:s"));
     return TRUE;
 }
+
+/**
+ * Implements hook_civicrm_managed().
+ *
+ * Generate a list of entities to create/deactivate/delete when this module
+ * is installed, disabled, uninstalled.
+ *
+ * @link http://wiki.civicrm.org/confluence/display/CRMDOC/hook_civicrm_managed
+ */
+function payment2c2p_civicrm_managed(&$entities) {
+    $entities[] = [
+        'module' => 'com.octopus8.payment2c2p',
+        'name' => 'Payment2c2p_Recurring_cron',
+        'entity' => 'Job',
+        'update' => 'always',
+        // Ensure local changes are kept, eg. setting the job active
+        'params' => [
+            'version' => 3,
+            'run_frequency' => 'Always',
+            'name' => 'Payment2c2p Recurring Payments',
+            'description' => 'Process pending and scheduled payments in the Payment2c2p processor',
+            'api_entity' => 'Job',
+            'api_action' => 'run_payment_cron',
+            'parameters' => "processor_name=Payment2c2p",
+            'is_active' => '1',
+        ],
+    ];
+    $entities[] = [
+        'module' => 'com.octopus8.payment2c2p',
+        'name' => 'Payment2c2p_Failed_Transaction_ActivityType',
+        'entity' => 'OptionValue',
+        'update' => 'always',
+        'params' => [
+            'version' => 3,
+            'option_group_id' => 'activity_type',
+            'label' => 'Payment2c2p Transaction Failed',
+            'is_reserved' => 1,
+            'filter' => 1,
+        ],
+    ];
+    $entities[] = [
+        'module' => 'com.octopus8.payment2c2p',
+        'name' => 'Payment2c2p_Succeed_Transaction_ActivityType',
+        'entity' => 'OptionValue',
+        'update' => 'always',
+        'params' => [
+            'version' => 3,
+            'option_group_id' => 'activity_type',
+            'label' => 'Payment2c2p Transaction Succeeded',
+            'is_reserved' => 1,
+            'filter' => 1,
+        ],
+    ];
+//    ///@todo
+//    $entities[] = [
+//        'module' => 'com.octopus8.payment2c2p',
+//        'name' => 'Payment2c2p_Transaction_Verification_cron',
+//        'entity' => 'Job',
+//        'update' => 'never',
+//        // Ensure local changes are kept, eg. setting the job active
+//        'params' => [
+//            'version' => 3,
+//            'run_frequency' => 'Always',
+//            'name' => 'Payment2c2p Transaction Verifications',
+//            'description' => 'Process pending transaction verifications in the Payment2c2p processor',
+//            'api_entity' => 'Payment2c2pContributionTransactions',
+//            'api_action' => 'validate',
+//            'parameters' => "",
+//            'is_active' => '1',
+//        ],
+//    ];
+    _payment2c2p_civix_civicrm_managed($entities);}
