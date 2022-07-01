@@ -1489,4 +1489,59 @@ class CRM_Payment2c2p_Utils
         return $answer;
     }
 
+    /**
+     * get_scheduled_contributions
+     *
+     * Gets recurring contributions that are scheduled to be processed today
+     *
+     * @return array An array of contribtion_recur objects
+     */
+    public static function get_scheduled_contributions($payment_processor_array) {
+        $scheduled_today = new CRM_Contribute_BAO_ContributionRecur();
+        print($payment_processor_array['id']);
+        print("\n");
+        // Only get contributions for the current processor
+        $scheduled_today->payment_processor_id = $payment_processor_array['id'];
+
+        // Only get contribution that are on or past schedule
+        $scheduled_today->whereAdd("`next_sched_contribution_date` <= now()");
+        $completed_status_id = self::contribution_status_id('Completed');
+        $pending_status_id = self::contribution_status_id('Pending');
+        $cancelled_status_id = self::contribution_status_id('Cancelled');
+        $failed_status_id = self::contribution_status_id('Failed');
+        $in_progress_status_id = self::contribution_status_id('In Progress');
+        $overdue_status_id = self::contribution_status_id('Overdue');
+        $refunded_status_id = self::contribution_status_id('Refunded');
+        $partially_paid_status_id = self::contribution_status_id('Partially paid');
+        $pending_refund_status_id = self::contribution_status_id('Pending refund');
+        $chargeback_paid_status_id = self::contribution_status_id('Chargeback');
+        $template_paid_status_id = self::contribution_status_id('Template');
+
+        // Don't get cancelled or failed contributions
+        $status_ids = implode(', ', [
+            $in_progress_status_id,
+            $pending_status_id ]);
+        $scheduled_today->whereAdd("`contribution_status_id` IN ({$status_ids})");
+
+        // Ignore transactions that have a failure_retry_date, these are subject to different conditions
+//        $scheduled_today->whereAdd("`failure_retry_date` IS NULL");
+
+        // CIVIEWAY-124: Exclude contributions that never completed
+        $t = $scheduled_today->tableName();
+        $ct = CRM_Contribute_BAO_Contribution::getTableName();
+        $scheduled_today->whereAdd("EXISTS (SELECT 1 FROM `{$ct}` WHERE `contribution_status_id` = $completed_status_id AND `{$t}`.id = `{$ct}`.`contribution_recur_id`)");
+
+        // Exclude contributions that have already been processed
+        $scheduled_today->whereAdd("NOT EXISTS (SELECT 1 FROM `{$ct}` WHERE `{$ct}`.`receive_date` >= `{$t}`.`next_sched_contribution_date` AND `{$t}`.id = `{$ct}`.`contribution_recur_id`)");
+//        print_r($scheduled_today->toArray());
+        $scheduled_today->find();
+
+        $scheduled_contributions = [];
+
+        while ($scheduled_today->fetch()) {
+            $scheduled_contributions[] = clone $scheduled_today;
+        }
+
+        return $scheduled_contributions;
+    }
 }

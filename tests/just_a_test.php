@@ -17,26 +17,33 @@ use Jose\Component\Signature\{Algorithm\PS256,
     Serializer\CompactSerializer as SignatureCompactSerializer};
 
 
+$invoiceNo = "92b31a12091c9c15932f5299bc5de023";
+
 //common data
-$path = E::path();
-$receiverPublicCert = "sandbox-jwt-2c2p.demo.2.1(public).cer";
-$path_to_2c2p_certificate = $path . DIRECTORY_SEPARATOR . "includes" . DIRECTORY_SEPARATOR . $receiverPublicCert;
-$senderPrivateKeyName = "private.pem"; //merchant generated private key
-$path_to_merchant_pem = $path . DIRECTORY_SEPARATOR . "includes" . DIRECTORY_SEPARATOR . $senderPrivateKeyName; //merchant generated private key
-$merchant_password = "octopus8"; //private key password
-$merchant_secret = "2FC22F51DBF485FC7821005B9BAF98BE609D28BAE12977039D59FB991B42B999";    //Get SecretKey from 2C2P PGW Dashboard
-$merchant_id = "702702000001066";        //Get MerchantID when opening account with 2C2P
-$date = date('Y-m-d h:i:s');
-$time_stamp = date('dmyhis', strtotime($date) . ' +1 day');
+/**
+ * @param string $invoiceNo
+ * @throws CRM_Core_Exception
+ */
+function printInvoiceInfo(string $invoiceNo): void
+{
+    $path = E::path();
+    $receiverPublicCert = "sandbox-jwt-2c2p.demo.2.1(public).cer";
+    $path_to_2c2p_certificate = $path . DIRECTORY_SEPARATOR . "includes" . DIRECTORY_SEPARATOR . $receiverPublicCert;
+    $senderPrivateKeyName = "private.pem"; //merchant generated private key
+    $path_to_merchant_pem = $path . DIRECTORY_SEPARATOR . "includes" . DIRECTORY_SEPARATOR . $senderPrivateKeyName; //merchant generated private key
+    $merchant_password = "octopus8"; //private key password
+    $merchant_secret = "2FC22F51DBF485FC7821005B9BAF98BE609D28BAE12977039D59FB991B42B999";    //Get SecretKey from 2C2P PGW Dashboard
+    $merchant_id = "702702000001066";        //Get MerchantID when opening account with 2C2P
+    $date = date('Y-m-d h:i:s');
+    $time_stamp = date('dmyhis', strtotime($date) . ' +1 day');
 //print("\n$time_stamp\n");
 //inquery
 
-$invoiceNo = "92b31a12091c9c15932f5299bc5de023";
-$processType = "I";
+    $processType = "I";
 //$request_type = "PaymentProcessRequest";
-$version = "2.1";
-$request_type = "RecurringMaintenanceRequest";
-$recurringUniqueID = "4992455";
+    $version = "2.1";
+    $request_type = "RecurringMaintenanceRequest";
+    $recurringUniqueID = "4992455";
 
 //$payment_inquiry = array (
 //    'request_type' => 'RecurringMaintenanceRequest',
@@ -55,15 +62,26 @@ $recurringUniqueID = "4992455";
 //            'chargeOnDate' => '',
 //);
 
-$response = CRM_Payment2c2p_Utils::getPaymentInquiryViaKeySignature(
-    $invoiceNo,
-    $processType,
-    $request_type,
-    $version,
-    $recurringUniqueID
-);
+    $response = CRM_Payment2c2p_Utils::getPaymentInquiryViaKeySignature(
+        $invoiceNo,
+        $processType,
+        $request_type,
+        $version,
+        $recurringUniqueID
+    );
 
 
+    print_r($response);
+}
+function printScheduledContributionsList(): void
+{
+    $payment_processor = CRM_Payment2c2p_Utils::getPaymentProcessorViaProcessorName('Payment2c2p');
+    $payment_processor_array = $payment_processor->getPaymentProcessor();
+    $response = CRM_Payment2c2p_Utils::get_scheduled_contributions($payment_processor_array);
 
-print_r($response);
+    print_r($response);
+}
+
+//printInvoiceInfo($invoiceNo);
+printScheduledContributionsList();
 
