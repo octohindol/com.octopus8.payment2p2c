@@ -258,9 +258,9 @@ function payment2c2p_civicrm_navigationMenu(&$menu)
  */
 function payment2c2p_civicrm_post($op, $objectName, $objectId, $objectRef)
 {
-    CRM_Core_Error::debug_var('started_civicrm_post', date("Y-m-d H:i:s"));
-    CRM_Core_Error::debug_var('op', $op);
-    CRM_Core_Error::debug_var('objectName', $objectName);
+//    CRM_Core_Error::debug_var('started_civicrm_post', date("Y-m-d H:i:s"));
+//    CRM_Core_Error::debug_var('op', $op);
+//    CRM_Core_Error::debug_var('objectName', $objectName);
     if ($op === 'edit' && $objectName === 'Contribution') {
         if (in_array(CRM_Core_PseudoConstant::getName('CRM_Contribute_BAO_Contribution',
             'contribution_status_id',
@@ -294,13 +294,15 @@ function payment2c2p_civicrm_post($op, $objectName, $objectId, $objectRef)
 
 
 /**
- * @param $contributionId
+ * @param $objectId
+ * @return bool
  * @throws CRM_Core_Exception
+ * @throws CiviCRM_API3_Exception
  */
 function payment2c2p_cancel_related_2c2p_record($objectId)
 {
-    CRM_Core_Error::debug_var('started', date("Y-m-d H:i:s"));
+    CRM_Core_Error::debug_var('started_canceling_related', date("Y-m-d H:i:s"));
     CRM_Core_Payment_Payment2c2p::setCancelledContributionStatus($objectId);
-    CRM_Core_Error::debug_var('ended', date("Y-m-d H:i:s"));
+    CRM_Core_Error::debug_var('ended_canceling_related', date("Y-m-d H:i:s"));
     return TRUE;
 }

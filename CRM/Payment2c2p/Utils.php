@@ -599,7 +599,8 @@ class CRM_Payment2c2p_Utils
     public static function verifyContribution($invoiceId): void
     {
         //todo recieve only payment
-//        CRM_Core_Error::debug_var('invoiceId', $invoiceId);
+//        CRM_Core_Error::debug_var('invoiceIdinverifyContribution', $invoiceId);
+//        Civi::log()->info("start_verifyContribution");
         $trxnId = substr($invoiceId, 0, CRM_Core_Payment_Payment2c2p::LENTRXNID);
         $contribution = self::getContributionByInvoiceId($invoiceId);
         //try to catch info using PaymentToken
@@ -607,44 +608,64 @@ class CRM_Payment2c2p_Utils
         if ($contribution['contribution_recur_id'] != null) {
             self::saveRecurringTokenValue($invoiceId, $paymentInquery);
         }
+        $completed_status_id = self::contribution_status_id('Completed');
+        $pending_status_id = self::contribution_status_id('Pending');
+        $cancelled_status_id = self::contribution_status_id('Cancelled');
+        $failed_status_id = self::contribution_status_id('Failed');
+        $in_progress_status_id = self::contribution_status_id('In Progress');
+        $overdue_status_id = self::contribution_status_id('Overdue');
+        $refunded_status_id = self::contribution_status_id('Refunded');
+        $partially_paid_status_id = self::contribution_status_id('Partially paid');
+        $pending_refund_status_id = self::contribution_status_id('Pending refund');
+        $chargeback_paid_status_id = self::contribution_status_id('Chargeback');
+        $template_paid_status_id = self::contribution_status_id('Template');
+
+
         if ("0000" == $paymentInquery['respCode']) {
             //OK
-            self::setContributionStatusCompleted($invoiceId, $paymentInquery, $contribution, $trxnId);
+            if ($contribution['contribution_status_id'] != $completed_status_id) {
+                self::setContributionStatusCompleted($invoiceId, $paymentInquery, $contribution, $trxnId);
+            }
             return;
         }
         if ("4200" == $paymentInquery['respCode']) {
             //@todo recurring contribution
-            self::setContributionStatusCompleted($invoiceId, $paymentInquery, $contribution, $trxnId);
+            Civi::log()->info("startingSettingStatusCompleted");
+            if ($contribution['contribution_status_id'] != $completed_status_id) {
+                self::setContributionStatusCompleted($invoiceId, $paymentInquery, $contribution, $trxnId);
+            }
+            Civi::log()->info("endedSettingStatusCompleted");
             return;
         }
         if ("0003" == $paymentInquery['respCode']) {
-            self::setContributionStatusCancelled($contribution);
+            Civi::log()->info("startedSettingStatusCancelled");
+            if ($contribution['contribution_status_id'] != $cancelled_status_id) {
+                self::setContributionStatusCancelled($contribution);
+            }
+            Civi::log()->info("endedSettingStatusCancelled");
             return;
         }
         $decodedTokenResponse = self::getPaymentInquiryViaKeySignature($invoiceId);
-        CRM_Core_Error::debug_var('paymentInqueryinVerifyContribution', $decodedTokenResponse);
 
         $resp_code = strval($decodedTokenResponse['respCode']);
-//        CRM_Core_Error::debug_var('decodedTokenResponse', $decodedTokenResponse);
 
-        //        CRM_Core_Error::debug_var('resp_code', $resp_code);
         if ($resp_code == "15") {
-            self::setContributionStatusCancelled($contribution);
+            if ($contribution['contribution_status_id'] != $cancelled_status_id) {
+                self::setContributionStatusCancelled($contribution);
+            }
             return;
         }
         if ($resp_code == "16") {
-            self::setContributionStatusCancelled($contribution);
+            if ($contribution['contribution_status_id'] != $cancelled_status_id) {
+                self::setContributionStatusCancelled($contribution);
+            }
             return;
         }
         $contribution_status = $decodedTokenResponse['status'];
-//        CRM_Core_Error::debug_var('contribution_status', $contribution_status);
+
         if ($decodedTokenResponse['status'] == "S") {
             if ($decodedTokenResponse['respDesc'] != "No refund records") {
-                $pending_status = CRM_Core_PseudoConstant::getKey(
-                    'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Pending');
-//                CRM_Core_Error::debug_var('contribution_status', $contribution['contribution_status_id']);
-//                CRM_Core_Error::debug_var('Pending', $pending_status);
-                if ($contribution['contribution_status_id'] == $pending_status) {
+                if ($contribution['contribution_status_id'] == $pending_status_id) {
                     self::setContributionStatusCompleted($invoiceId, $decodedTokenResponse, $contribution, $trxnId);
                 }
                 self::setContributionStatusRefunded($contribution);
@@ -652,7 +673,6 @@ class CRM_Payment2c2p_Utils
             }
         }
         if ($contribution_status !== "A") {
-
             if (in_array($contribution_status, [
                 "V"])) {
                 self::setContributionStatusCancelled($contribution);
@@ -665,36 +685,24 @@ class CRM_Payment2c2p_Utils
                 "ROE",
                 "EX",
                 "CTF"])) {
-                $failed_status_id = CRM_Core_PseudoConstant::getKey(
-                    'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Failed');
                 self::changeContributionStatusViaDB($invoiceId, $failed_status_id);
                 return;
             }
 
             if ($contribution_status == "RF") {
-                $pending_status = CRM_Core_PseudoConstant::getKey(
-                    'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Pending');
-                if ($contribution['contribution_status_id'] == $pending_status) {
+                if ($contribution['contribution_status_id'] == $pending_status_id) {
                     self::setContributionStatusCompleted($invoiceId, $decodedTokenResponse, $contribution, $trxnId);
                 }
                 self::setContributionStatusRefunded($contribution);
             }
 
             if (in_array($contribution_status, ["AP", "RP", "VP"])) {
-                $contribution_status_id =
-                    CRM_Core_PseudoConstant::getKey(
-                        'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Pending');
-                self::changeContributionStatusViaDB($invoiceId, $contribution_status_id);
+                self::changeContributionStatusViaDB($invoiceId, $pending_status_id);
             }
 
             if ($contribution_status == "RS") {
-                $contribution_status_id =
-                    CRM_Core_PseudoConstant::getKey(
-                        'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'In Progress');
-                self::changeContributionStatusViaDB($invoiceId, $contribution_status_id);
+                self::changeContributionStatusViaDB($invoiceId, $in_progress_status_id);
             }
-
-//            CRM_Core_Error::debug_var('contribution_status_id', $contribution_status_id);
             return;
         }
         self::setContributionStatusCompleted($invoiceId, $decodedTokenResponse, $contribution, $trxnId);
@@ -871,29 +879,24 @@ class CRM_Payment2c2p_Utils
      */
     public static function setContributionStatusCancelled($contribution): void
     {
-        $contribution_status_id
-            =
-            CRM_Core_PseudoConstant::getKey(
-                'CRM_Contribute_BAO_Contribution',
-                'contribution_status_id',
-                'Cancelled');
+//        CRM_Core_Error::debug_var('contribution', $contribution);
+//        Civi::log()->info("setContributionStatusCancelled1");
+        $cancelled_status_id = self::contribution_status_id('Cancelled');
 
-        if ($contribution['contribution_status_id'] == $contribution_status_id) {
+        if ($contribution['contribution_status_id'] == $cancelled_status_id) {
             return;
         }
 
-        $contribution_change = array(
-            'id' => $contribution['id'],
-//                    'cancel_reason' => $params['cancel_reason'] ?? NULL,
-            'contribution_status_id' => $contribution_status_id,
-        );
-        if ((!array_key_exists('cancel_date', $contribution))
-            || $contribution['cancel_date'] == null
-            || $contribution['cancel_date'] == "") {
-            $contribution_change['cancel_date'] = date('YmdHis');
-        }
+        $change_result1 = CRM_Core_DAO::setFieldValue('CRM_Contribute_DAO_Contribution',
+            $contribution['id'],
+            'contribution_status_id',
+            $cancelled_status_id);
 
-        civicrm_api3('Contribution', 'create', $contribution_change);
+        $now = date('YmdHis');
+        $change_result2 = CRM_Core_DAO::setFieldValue('CRM_Contribute_DAO_Contribution',
+            $contribution['id'],
+            'cancel_date',
+            $now);
 
     }
 
@@ -903,18 +906,23 @@ class CRM_Payment2c2p_Utils
      */
     public static function setContributionStatusRefunded($contribution): void
     {
-        $contribution_status_id =
-            CRM_Core_PseudoConstant::getKey(
-                'CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Refunded');
-        $contribution_change = array(
-            'id' => $contribution['id'],
-//                    'cancel_reason' => $params['cancel_reason'] ?? NULL,
-            'contribution_status_id' => $contribution_status_id,
-        );
-        if (!array_key_exists('cancel_date', $contribution) || $contribution['cancel_date'] == null || $contribution['cancel_date'] == "") {
-            $contribution_change['cancel_date'] = date('YmdHis');
+        $contribution_status_id = self::contribution_status_id('Refunded');
+        if ($contribution['contribution_status_id'] == $contribution_status_id) {
+            return;
         }
-        civicrm_api3('Contribution', 'create', $contribution_change);
+
+        $change_result1 = CRM_Core_DAO::setFieldValue('CRM_Contribute_DAO_Contribution',
+            $contribution['id'],
+            'contribution_status_id',
+            $contribution_status_id);
+
+        $now = date('YmdHis');
+        if (!array_key_exists('cancel_date', $contribution) || $contribution['cancel_date'] == null || $contribution['cancel_date'] == "") {
+            $change_result2 = CRM_Core_DAO::setFieldValue('CRM_Contribute_DAO_Contribution',
+                $contribution['id'],
+                'cancel_date',
+                $now);
+        }
     }
 
     /**
@@ -1324,13 +1332,12 @@ class CRM_Payment2c2p_Utils
     }
 
 
-
     /**
-     * @todo?
      * @param string|null $unencrypted_payload
      * @param $secretKey
      * @return array
      * @throws CRM_Core_Exception
+     * @todo?
      */
     protected static function unencryptRecurringPaymentAnswer(?string $unencrypted_payload, $secretKey): array
     {

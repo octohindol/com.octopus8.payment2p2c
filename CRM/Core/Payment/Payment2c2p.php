@@ -603,6 +603,7 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     public static function setCancelledContributionStatus($contributionId): void
     {
         //todo recieve only payment
+        Civi::log()->info("setCancelledContributionStatus1");
         $contributionParams = [
             'options' => ['limit' => 1, 'sort' => 'id DESC'],
         ];
@@ -611,28 +612,39 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         $contribution = civicrm_api3('Contribution', 'get', $contributionParams)['values'];
         $contribution = reset($contribution);
 //        CRM_Core_Error::debug_var('contribution', $contribution);
+        Civi::log()->info("setCancelledContributionStatus2");
         $invoiceId = $contribution["invoice_id"];
 //        CRM_Core_Error::debug_var('gotcontribution', date("Y-m-d H:i:s"));
-        $decodedTokenResponse = self::getPaymentInquiryViaKeySignature($invoiceId);
+        $decodedTokenResponse = CRM_Payment2c2p_Utils::getPaymentInquiryViaKeySignature($invoiceId);
 //        CRM_Core_Error::debug_var('decodedTokenResponseStatus', $decodedTokenResponse['status']);
 //        CRM_Core_Error::debug_var('gotdecodedTokenResponseStatus', date("Y-m-d H:i:s"));
         if ($decodedTokenResponse['status'] == "A") {
-            $cancelledTokenResponse = self::setPaymentInquiryViaKeySignature($invoiceId, "V");
+            Civi::log()->info("setCancelledContributionStatus3");
+
+            $cancelledTokenResponse = CRM_Payment2c2p_Utils::setPaymentInquiryViaKeySignature($invoiceId, "V");
+            Civi::log()->info("setCancelledContributionStatus4");
         }
         if ($decodedTokenResponse['status'] == "S") {
-            $decodedTokenResponse = self::getPaymentInquiryViaKeySignature($invoiceId, "RS");
+            Civi::log()->info("setCancelledContributionStatus5");
+
+            $decodedTokenResponse = CRM_Payment2c2p_Utils::getPaymentInquiryViaKeySignature($invoiceId, "RS");
+            Civi::log()->info("setCancelledContributionStatus6");
             if ($decodedTokenResponse['status'] == "S") {
                 if ($decodedTokenResponse['respDesc'] == "No refund records") {
                     $amount = strval($decodedTokenResponse["amount"]);
-                    $cancelledTokenResponse = self::setPaymentInquiryViaKeySignature($invoiceId, "R", $amount);
+                    Civi::log()->info("setCancelledContributionStatus7");
+                    $cancelledTokenResponse = CRM_Payment2c2p_Utils::setPaymentInquiryViaKeySignature($invoiceId, "R", $amount);
+                    Civi::log()->info("setCancelledContributionStatus8");
                 }
                 if ($decodedTokenResponse['respDesc'] != "No refund records") {
 //                    CRM_Core_Error::debug_var('decodedRFTokenResponse', $decodedTokenResponse);
+                    Civi::log()->info("setCancelledContributionStatus9");
                     CRM_Core_Error::debug_var('gotdecodedRFTokenResponse', date("Y-m-d H:i:s"));
                 }
             }
             if ($decodedTokenResponse['status'] != "S") {
 //                CRM_Core_Error::debug_var('decodedNonSRFTokenResponse', $decodedTokenResponse);
+                Civi::log()->info("setCancelledContributionStatus10");
                 CRM_Core_Error::debug_var('gotdecodedNonSRFTokenResponse', date("Y-m-d H:i:s"));
             }
         }
@@ -707,17 +719,19 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     public static function checkPendingContribution()
     {
 
-//        CRM_Core_Error::debug_var('request', $_REQUEST);
-//        CRM_Core_Error::debug_var('post', $_POST);
+        CRM_Core_Error::debug_var('request', $_REQUEST);
+        CRM_Core_Error::debug_var('post', $_POST);
 //        CRM_Core_Error::debug_var('started_checking_pending', date("Y-m-d H:i:s"));
 //        CRM_Core_Error::statusBounce(date("Y-m-d H:i:s"), null, '2c2p');
         $invoiceId = null;
         $invoiceId = CRM_Utils_Request::retrieveValue('invoiceId', 'String', null);
-//        CRM_Core_Error::debug_var('invoiceId', $invoiceId);
+        CRM_Core_Error::debug_var('invoiceId', $invoiceId);
         if ($invoiceId) {
 //            try {
 //                CRM_Core_Error::debug_var('before', $invoiceId);
-            self::verifyContribution($invoiceId);
+            CRM_Payment2c2p_Utils::verifyContribution($invoiceId);
+            CRM_Utils_System::redirect('civicrm');
+            return TRUE;
 //            CRM_Core_Error::debug_var('after', $invoiceId);
 //            } catch (Exception $e) {
 //                CRM_Core_Error::debug_var('error', $e->getMessage());
