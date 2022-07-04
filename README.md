@@ -110,3 +110,5 @@ define( 'CIVICRM_UF_BASEURL'      , 'https://########.ngrok.io');
 - 0.1.24 Checking cancelled transactions - lots of logging
 
 - 0.1.25 Url Api Added
+
+- 0.1.27 Omitted checking payment via Key-Signature for 0000 and 0003 resp codes
