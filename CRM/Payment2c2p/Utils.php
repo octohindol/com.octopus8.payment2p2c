@@ -1836,10 +1836,10 @@ class CRM_Payment2c2p_Utils
         $contributionRecurID = $contributionRecur->id;
         $updated_contribution_record = [];
         $new_contribution_record = [];
-//        CRM_Core_Error::debug_var('invoice_id', $invoice_id);
-//        CRM_Core_Error::debug_var('contributionRecur', $contributionRecur);
-//        CRM_Core_Error::debug_var('firstContribution', $firstContribution);
-//        CRM_Core_Error::debug_var('apiContribution', $apiContribution);
+        CRM_Core_Error::debug_var('invoice_id', $invoice_id);
+        CRM_Core_Error::debug_var('contributionRecur', $contributionRecur);
+        CRM_Core_Error::debug_var('firstContribution', $firstContribution);
+        CRM_Core_Error::debug_var('apiContribution', $apiContribution);
 //        CRM_Core_Error::debug_var('updated_contribution_record1', $updated_contribution_record);
         if (empty($firstContribution['tax_amount'])) {
             $firstContribution['tax_amount'] = 0;
@@ -1897,7 +1897,12 @@ class CRM_Payment2c2p_Utils
             $new_contribution_record['source'] = "Payment2c2p Recurring {$financial_type}:\n{$contributionSource}";
             $new_contribution_record['contribution_page_id'] = $contributionPageId;
             $new_contribution_record['is_test'] = $contributionIsTest;
-            $new_contribution_record['trxn_id'] = $apiContribution['referenceNo'];
+            if (key_exists('referenceNo', $apiContribution)) {
+                $new_contribution_record['trxn_id'] = $apiContribution['referenceNo'];
+            }
+            if (!key_exists('referenceNo', $apiContribution)) {
+                $new_contribution_record['trxn_id'] = $invoice_id;
+            }
             $new_contribution_record['is_email_receipt'] = 0;
 
             if ($apiContributionRespStatus != '00') {
@@ -1945,18 +1950,18 @@ class CRM_Payment2c2p_Utils
                 ? 'completetransaction'
                 : 'create'
             );
-//            CRM_Core_Error::debug_var('new_contribution_record', $new_contribution_record);
-//            CRM_Core_Error::debug_var('api_action', $api_action);
+            CRM_Core_Error::debug_var('new_contribution_record', $new_contribution_record);
+            CRM_Core_Error::debug_var('api_action', $api_action);
             $updatedAPI = civicrm_api3('Contribution', $api_action, $new_contribution_record);
             $updated_contribution_record = reset($updatedAPI['values']);
-//            CRM_Core_Error::debug_var('completed_contribution_record', $updated_contribution_record);
+            CRM_Core_Error::debug_var('completed_contribution_record', $updated_contribution_record);
 
             // Many things does not seem to be recorded by
             // Contribution.completetransaction, so let's update it directly.
             if ($api_action === 'completetransaction') {
                 $updatedAPI = civicrm_api3('Contribution', 'create', $new_contribution_record);
                 $updated_contribution_record = reset($updatedAPI['values']);
-//                CRM_Core_Error::debug_var('completed_saved_contribution_record', $updated_contribution_record);
+                CRM_Core_Error::debug_var('completed_saved_contribution_record', $updated_contribution_record);
             }
 
             if ($apiContributionRespStatus != '00') {
