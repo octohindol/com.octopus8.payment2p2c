@@ -124,20 +124,25 @@ class CRM_Payment2c2p_Utils
 
     /**
      * @param $invoiceId
-     * @return mixed
+     * @return int
+     * @throws CiviCRM_API3_Exception
      */
     protected static function getPaymentProcessorIdViaInvoiceID($invoiceId): int
     {
         try {
             $payment_token = self::getPaymentTokenViaInvoiceID($invoiceId);
-            CRM_Core_Error::debug_var('payment_token_getPaymentProcessorIdViaInvoiceID', $payment_token);
-
-            $paymentProcessorId = $payment_token['payment_processor_id'];
-            return (int)$paymentProcessorId;
-
+//            CRM_Core_Error::debug_var('payment_token_getPaymentProcessorIdViaInvoiceID', $payment_token);
+            if (key_exists('payment_processor_id', $payment_token)) {
+                $paymentProcessorId = $payment_token['payment_processor_id'];
+                return (int)$paymentProcessorId;
+            }
+            if (!key_exists('payment_processor_id', $payment_token)) {
+                $pP = self::getPaymentProcessorViaProcessorName('Payment2c2p');
+                $pp = $pP->getPaymentProcessor();
+                return (int)$pp['id'];
+            }
         } catch (CRM_Core_Exception $e) {
             $pP = self::getPaymentProcessorViaProcessorName('Payment2c2p');
-            CRM_Core_Error::debug_var('pP_getPaymentProcessorIdViaInvoiceID', $pP);
             $pp = $pP->getPaymentProcessor();
             return (int)$pp['id'];
         }
@@ -160,6 +165,11 @@ class CRM_Payment2c2p_Utils
     public static function getPaymentInquiryViaPaymentToken($invoiceID): array
     {
         $payment_token = self::getPaymentTokenViaInvoiceID($invoiceID);
+        $decodedTokenResponse = [];
+        if (!key_exists('token', $payment_token)) {
+            $decodedTokenResponse = [];
+            return $decodedTokenResponse;
+        }
         $paymentToken = $payment_token['token'];
         $paymentTokenID = $payment_token['id'];
         $paymentProcessorId = $payment_token['payment_processor_id'];
@@ -502,13 +512,14 @@ class CRM_Payment2c2p_Utils
      */
     public static function getPaymentTokenViaInvoiceID($invoiceID)
     {
+        $payment_token = [];
         try {
             $payment_token = civicrm_api3('PaymentToken', 'getsingle', [
                 'masked_account_number' => $invoiceID,
             ]);
         } catch (CiviCRM_API3_Exception $e) {
             CRM_Core_Error::debug_var('API error', $e->getMessage() . "\nInvoiceID: $invoiceID\n");
-            throw new CRM_Core_Exception(ts('2c2p - Could not find payment token') . "\nInvoiceID: $invoiceID\n");
+//            throw new CRM_Core_Exception(ts('2c2p - Could not find payment token') . "\nInvoiceID: $invoiceID\n");
         }
         return $payment_token;
     }
@@ -625,7 +636,7 @@ class CRM_Payment2c2p_Utils
         if ($cancelDate == "") {
             $cancelDate = $now;
         }
-        CRM_Core_Error::debug_var('cancelDate', $cancelDate);
+//        CRM_Core_Error::debug_var('cancelDate', $cancelDate);
         $change_result2 = CRM_Core_DAO::setFieldValue('CRM_Contribute_DAO_ContributionRecur',
             $contributionRecur->id,
             'cancel_date',
@@ -729,7 +740,7 @@ class CRM_Payment2c2p_Utils
             );
         $response_body_contents = $response->getBody()->getContents();
 
-        CRM_Core_Error::debug_var('response_body_contents_before', $response_body_contents);
+//        CRM_Core_Error::debug_var('response_body_contents_before', $response_body_contents);
         $path_to_2c2p_certificate = self::getOpenCertificatePath();
         $path_to_merchant_pem = self::getClosedCertificatePath();
         $merchant_password = self::getClosedCertificatePwd();
@@ -1234,7 +1245,7 @@ class CRM_Payment2c2p_Utils
      *
      * @return array An array of contribtion_recur objects
      */
-    public static function get_scheduled_contributions($payment_processor_array)
+    public static function get_scheduled_contribution_recurs($payment_processor_array)
     {
         $scheduled_today = new CRM_Contribute_BAO_ContributionRecur();
         // Only get contributions for the current processor
@@ -1253,14 +1264,11 @@ class CRM_Payment2c2p_Utils
             $pending_status_id]);
         $scheduled_today->whereAdd("`contribution_status_id` IN ({$status_ids})");
 
-        // Ignore transactions that have a failure_retry_date, these are subject to different conditions
-//        $scheduled_today->whereAdd("`failure_retry_date` IS NULL");
-
-        // CIVIEWAY-124: Exclude contributions that never completed
+        // Exclude contributions that never completed
         $t = $scheduled_today->tableName();
         $ct = CRM_Contribute_BAO_Contribution::getTableName();
-//        $scheduled_today->whereAdd("EXISTS (SELECT 1 FROM `{$ct}`
-//        WHERE `contribution_status_id` = $completed_status_id AND `{$t}`.id = `{$ct}`.`contribution_recur_id`)");
+        $scheduled_today->whereAdd("EXISTS (SELECT 1 FROM `{$ct}`
+        WHERE `contribution_status_id` = $completed_status_id AND `{$t}`.id = `{$ct}`.`contribution_recur_id`)");
         $status_ids = implode(', ', [
             $completed_status_id,
             $in_progress_status_id,
@@ -1268,10 +1276,6 @@ class CRM_Payment2c2p_Utils
         ]);
 
         // Exclude contributions that have already been processed
-//        $scheduled_today->whereAdd("NOT EXISTS (SELECT 1 FROM `{$ct}` WHERE
-//        `{$ct}`.`receive_date` >= `{$t}`.`next_sched_contribution_date`
-//        AND `{$t}`.id = `{$ct}`.`contribution_recur_id`
-//        AND `{$ct}`.`contribution_status_id` IN ({$status_ids}))");
         $scheduled_today->find();
 
         $scheduled_contributions = [];
@@ -1332,9 +1336,9 @@ class CRM_Payment2c2p_Utils
     public static function update_recurring_contribution_status($next_sched_contribution_date, $contributionRecurID)
     {
         $d_now = new DateTime();
-        CRM_Core_Error::debug_var('next_sched_in_update', $next_sched_contribution_date);
+//        CRM_Core_Error::debug_var('next_sched_in_update', $next_sched_contribution_date);
         $next_sched_iso = CRM_Utils_Date::isoToMysql($next_sched_contribution_date);
-        CRM_Core_Error::debug_var('next_sched_iso', $next_sched_iso);
+//        CRM_Core_Error::debug_var('next_sched_iso', $next_sched_iso);
 
         if ($next_sched_contribution_date) {
             CRM_Core_DAO::setFieldValue('CRM_Contribute_DAO_ContributionRecur',
@@ -1418,14 +1422,12 @@ class CRM_Payment2c2p_Utils
 
 
         // Process today's scheduled contributions.
-        $scheduled_contributions = self::get_scheduled_contributions($payment_processor);
+        $scheduled_recurring_contributions = self::get_scheduled_contribution_recurs($payment_processor);
         //        //We don't have failed contributions to work with
-        //        $scheduled_failed_contributions = self::get_scheduled_failed_contributions($payment_processor);
-        //        $scheduled_contributions = array_merge($scheduled_failed_contributions, $scheduled_contributions);
 
-        Civi::log()->debug("Have found " . sizeof($scheduled_contributions) . "contributions to do!\n");
+        Civi::log()->debug("Have found " . sizeof($scheduled_recurring_contributions) . " recurring contributions to do!\n");
 
-        foreach ($scheduled_contributions as $contributionRecur) {
+        foreach ($scheduled_recurring_contributions as $contributionRecur) {
 
             if ($contributionRecur->payment_processor_id != $payment_processor['id']) {
                 Civi::log()->debug("Sorry, this contributionRecur is not our processors: " . $contributionRecur->id . "\n");
@@ -1434,7 +1436,7 @@ class CRM_Payment2c2p_Utils
             $contibutionsToCheck = 0;
             $contributionRecurID = $contributionRecur->id;
             $invoicePrefix = "";
-            CRM_Core_Error::debug_var('contributionRecurID01', $contributionRecurID);
+//            CRM_Core_Error::debug_var('contributionRecurID01', $contributionRecurID);
 
             //check if contribution_recur is OK?
             $contributionRecurInvoiceId = $contributionRecur->invoice_id;
@@ -1443,22 +1445,25 @@ class CRM_Payment2c2p_Utils
             try {
 
                 $paymentInquiry = CRM_Payment2c2p_Utils::getPaymentInquiryViaPaymentToken($contributionRecurInvoiceId);
-                CRM_Core_Error::debug_var('paymentInquiry', $paymentInquiry);
-                $paymentToken = (string) $paymentInquiry['token'];
-                $paymentTokenID = (string) $paymentInquiry['tokenID'];
-                CRM_Core_DAO::setFieldValue('CRM_Contribute_DAO_ContributionRecur',
-                    $contributionRecurID,
-                    'payment_token_id',
-                    $paymentTokenID);
-                $recurringUniqueID = (string) $paymentInquiry['recurringUniqueID'];
-                if($recurringUniqueID == ""){
-                    $recurringUniqueID = (string) self::getRecurringPaymentIdViaPaymentToken($contributionRecurInvoiceId);
+                if (!key_exists('token', $paymentInquiry)) {
+                    Civi::log()->debug("Sorry, this contributionRecur $contributionRecurID has no Payment Token\n");
+                }
+                if (key_exists('token', $paymentInquiry)) {
+//                    CRM_Core_Error::debug_var('paymentInquiry', $paymentInquiry);
+                    $paymentTokenID = (string)$paymentInquiry['tokenID'];
+                    CRM_Core_DAO::setFieldValue('CRM_Contribute_DAO_ContributionRecur',
+                        $contributionRecurID,
+                        'payment_token_id',
+                        $paymentTokenID);
+                    $recurringUniqueID = (string)$paymentInquiry['recurringUniqueID'];
+                    if ($recurringUniqueID == "") {
+                        $recurringUniqueID = (string)self::getRecurringPaymentIdViaPaymentToken($contributionRecurInvoiceId);
+                    }
                 }
             } catch (CRM_Core_Exception $e) {
                 Civi::log()->debug($e->getMessage());
                 Civi::log()->debug("Sorry, this contributionRecur $contributionRecurID has no recurringUniqueID\n");
             }
-            CRM_Core_Error::debug_var('contributionRecurID02', $recurringUniqueID);
             if ($recurringUniqueID === "") {
                 $note = new CRM_Core_BAO_Note();
                 $note->entity_table = 'civicrm_contribution_recur';
@@ -1487,14 +1492,13 @@ class CRM_Payment2c2p_Utils
                     $version,
                     $recurringUniqueID
                 );
-                CRM_Core_Error::debug_var('recurringPaymentInquery', $recurringPaymentInquery);
+//                CRM_Core_Error::debug_var('recurringPaymentInquery', $recurringPaymentInquery);
                 $invoicePrefix = $recurringPaymentInquery['invoicePrefix'];
                 CRM_Core_DAO::setFieldValue('CRM_Contribute_DAO_ContributionRecur',
                     $contributionRecurID,
                     'trxn_id',
                     $recurringUniqueID);
-
-                if($recurringPaymentInquery['recurringStatus'] == "N"){ //Contribution finished
+                if ($recurringPaymentInquery['recurringStatus'] == "N") { //Contribution finished
                     CRM_Core_DAO::setFieldValue('CRM_Contribute_DAO_ContributionRecur',
                         $contributionRecurID,
                         'contribution_status_id',
@@ -1504,7 +1508,7 @@ class CRM_Payment2c2p_Utils
                         'end_date',
                         $recurringPaymentInquery['chargeNextDate']);
                 }
-                if($recurringPaymentInquery['recurringStatus'] == "Y"){ //Contribution finished
+                if ($recurringPaymentInquery['recurringStatus'] == "Y") { //Contribution finished
                     CRM_Core_DAO::setFieldValue('CRM_Contribute_DAO_ContributionRecur',
                         $contributionRecurID,
                         'contribution_status_id',
@@ -1531,289 +1535,470 @@ class CRM_Payment2c2p_Utils
             ]);
             $completedContributionsCount = $madeContributions['count'];
             $madeContributions = $madeContributions['values'];
-            $madeContributionsFirst = $madeContributions[0];
-            $invoicePrefix = substr($contributionRecur->invoice_id, 0, CRM_Core_Payment_Payment2c2p::LENTRXNID);
+            $firstContribution = array_shift($madeContributions);
             Civi::log()->debug("Completed Contributions Count for $contributionRecurID: $completedContributionsCount\n");
             Civi::log()->debug("Contributions to check for $contributionRecurID: $contibutionsToCheck\n");
             Civi::log()->debug("Invoice Prefix to check for $contributionRecurID: $contibutionsToCheck\n");
             $contributionNumber = 1;
-            while($contibutionsToCheck > 0){
+            while ($contibutionsToCheck > 0) {
                 $number = substr('00000' . $contributionNumber, -5);
-                $current_invoice_id = $invoicePrefix . $number;//@todo
+                $current_invoice_id = $invoicePrefix . $number;//
                 Civi::log()->debug("Current Invoice Number to check for $contributionRecurID: $current_invoice_id\n");
+                //get contribution from CiviCRM
                 $currentContributionsAPI = civicrm_api3('Contribution', 'get', [
-                    'options' => ['limit' => 0, 'sort' => "id ASC"],
+                    'options' => ['limit' => 1, 'sort' => "id ASC"],
                     'sequential' => 1,
                     'invoice_id' => $current_invoice_id,
                 ]);
-                $currentContributions = $currentContributionsAPI['values'];
+
+                //get contribution from 2c2p
                 if ($currentContributionsAPI['count'] <= 0) {
+                    $apiContribution = self::getPaymentInquiryViaKeySignature($current_invoice_id);
+//                    CRM_Core_Error::debug_var('apiContribution', $apiContribution);
+                    $currentContribution = [];
                     Civi::log()->debug("We should create Current Invoice Number $contributionRecurID: $current_invoice_id\n");
+                    $new_contribution = self::processNewContributionFromRecurring(
+                        $current_invoice_id,
+                        $contributionRecur,
+                        $firstContribution,
+                        $apiContribution);
                 }
                 if ($currentContributionsAPI['count'] > 0) {
-                    Civi::log()->debug("We should check Current Invoice Number $contributionRecurID: $current_invoice_id\n");
+                    Civi::log()->debug("We skip Current Invoice Number $contributionRecurID: $current_invoice_id\n");
                 }
 //                $paymentProcessorInfo = array_shift($paymentProcessorInfo);
                 $contributionNumber = $contributionNumber + 1;
                 $contibutionsToCheck = $contibutionsToCheck - 1;
-            }
-            continue;
-
-            /* Schedule next contributionRecur */
-            if (($contributionRecur->installments <= 0) // immortal contributionRecur
-                || ($contributionRecur->installments > $completedContributionsCount + 1 //not the last one
-                )) {
-                $next_sched_contribution_date = date('Y-m-d 00:00:00', strtotime($present_next_sched_contribution_date . " +{$contributionRecur->frequency_interval} {$contributionRecur->frequency_unit}s"));
-                Civi::log()->debug("Next Contribution Date for $present_next_sched_contribution_date: $next_sched_contribution_date\n");
-            } else { //last one = count = all contributions + 1 contributionRecur
-                $next_sched_contribution_date = NULL;
-                /* Mark recurring contributionRecur as completed*/
-                civicrm_api(
-                    'ContributionRecur', 'create',
-                    [
-                        'version' => '3',
-                        'id' => $contributionRecurID,
-                        'contribution_recur_status_id' => $completed_status_id,
-                    ]
-                );
-            }
-
-            // Process payment
-            Civi::log()->debug("Processing payment for scheduled recurring contributionRecurID $contributionRecurID\n");
-
-            //Get InvoiceID for this installment like ABCD00001
-            $invoicePrefix = substr($contributionRecur->invoice_id, 0, CRM_Core_Payment_Payment2c2p::LENTRXNID);
-            $number = substr('00000' . $completedContributionsCount, -5);
-            $invoice_id = $invoicePrefix . $number;//@todo
-
-            try {
-                if (!$contributionRecur->failure_retry_date) {
-                    // Only update the next schedule if we're not in a retry state.
-                    self::update_recurring_contribution_status($next_sched_contribution_date, $contributionRecurID);
-                }
-
-                $new_contribution_record = [];
-//                $madeContributionsFirst = $madeContributions[0];
-                if (empty($madeContributionsFirst['tax_amount'])) {
-                    $madeContributionsFirst['tax_amount'] = 0;
-                }
-                $madeContributionTaxAmount = $madeContributionsFirst['tax_amount'];
-                $contributionAmount = $contributionRecur->amount;
-                $contributionTotalAmount = $contributionAmount - $madeContributionTaxAmount;
-
-                $contribution_params = [
-                    'contribution_recur_id' => $contributionRecurID,
-                    'contribution_status_id' => $pending_status_id,
-                    'total_amount' => $contributionRecur->amount,
-                    'is_email_receipt' => 0,
-                ];
-
-                $contribution = civicrm_api3('Contribution', 'repeattransaction', $contribution_params);
-                CRM_Core_Error::debug_var('contribution', $contribution);
-                $new_contribution_record = $contribution;
-                $contribution_recieve_date = CRM_Utils_Date::isoToMysql(date('Y-m-d H:i:s')); //todo
-                Civi::log()->debug("Creating Contribution $invoice_id for $contributionRecurID contributionRecur record\n");
-                $new_contribution_record['contact_id'] = $contributionRecur->contact_id;
-                $new_contribution_record['receive_date'] = $contribution_recieve_date;
-                $new_contribution_record['total_amount'] = $contributionTotalAmount;
-                $new_contribution_record['contribution_recur_id'] = $contributionRecurID;
-                $new_contribution_record['payment_instrument_id'] = $contributionRecur->payment_instrument_id;
-                $new_contribution_record['invoice_id'] = $invoice_id;
-                $new_contribution_record['invoice_number'] = $contributionRecur->invoice_id;
-                $new_contribution_record['campaign_id'] = $contributionRecur->campaign_id;
-                $new_contribution_record['financial_type_id'] = $contributionRecur->financial_type_id;
-                $new_contribution_record['payment_processor'] = $contributionRecur->payment_processor_id;
-                $new_contribution_record['payment_processor_id'] = $contributionRecur->payment_processor_id;
-
-
-                $precedent = new CRM_Contribute_BAO_Contribution();
-                $precedent->id = $madeContributionsFirst['id'];
-
-                $contributionSource = '';
-                $contributionPageId = '';
-                $contributionIsTest = 0;
-
-                if ($precedent->find(TRUE)) {
-                    $contributionSource = $precedent->source;
-                    $contributionPageId = $precedent->contribution_page_id;
-                    $contributionIsTest = $precedent->is_test;
-                }
-
-                try {
-                    $financial_type = civicrm_api3(
-                        'FinancialType', 'getsingle', [
-                        'sequential' => 1,
-                        'return' => "name",
-                        'id' => $contributionRecur->financial_type_id,
-                    ]);
-                } catch (CiviCRM_API3_Exception $e) { // Most likely due to FinancialType API not being available in < 4.5 - try DAO directly
-                    $ft_bao = new CRM_Financial_BAO_FinancialType();
-                    $ft_bao->id = $contributionRecur->financial_type_id;
-                    $found = $ft_bao->find(TRUE);
-                    $financial_type = (array)$ft_bao;
-                }
-
-
-                if (!isset($financial_type['name'])) {
-                    throw new Exception (
-                        "Financial type could not be loaded for {$contributionRecur->id}"
-                    );
-                }
-
-                $new_contribution_record['source'] = "Payment2c2p Recurring {$financial_type['name']}:\n{$contributionSource}";
-                $new_contribution_record['contribution_page_id'] = $contributionPageId;
-                $new_contribution_record['is_test'] = $contributionIsTest;
-
-                // Retrieve the eWAY token
-
-//                if (!empty($contributionRecur->payment_token_id)) {
-//                    try {
-//                        $token = civicrm_api3('PaymentToken', 'getvalue', [
-//                            'return' => 'token',
-//                            'id' => $contributionRecur->payment_token_id,
-//                        ]);
-//                    } catch (CiviCRM_API3_Exception $e) {
-//                        $token = $contributionRecur->processor_id;
-//                    }
-//                } else {
-//                    $token = $contributionRecur->processor_id;
-//                }
-
-//                if (!$token) {
-////                    throw new CRM_Core_Exception(E::ts('No token found for Recurring Contribution %1', [1 => $contributionRecur->id]));
-//                }
-
-                $p2c2pResponse = self::getPaymentInquiryViaKeySignature($invoice_id);
-                CRM_Core_Error::debug_var('p2c2pResponseToDo', $p2c2pResponse);
-                $p2c2pResponse = [];//@todo
-                $p2c2pResponse['TransactionID'] = $invoice_id;//@todo
-                $p2c2pResponse['Errors'] = [];//@todo
-                $p2c2pResponse['ResponseMessages'] = [];//@todo
-                $p2c2pResponse['Status'] = TRUE;//@todo
-                $new_contribution_record['trxn_id'] = $p2c2pResponse['TransactionID'];
-
-                $responseErrors = $p2c2pResponse['Errors'];
-
-                if ($p2c2pResponse['Status']) {
-                    $responseMessages = $p2c2pResponse['ResponseMessages']; //@todo
-                    $responseErrors = array_merge($responseMessages, $responseErrors);
-                }
-
-                if (count($responseErrors)) {
-                    // Mark transaction as failed
-                    $new_contribution_record['contribution_status_id'] = $failed_status_id;
-                    self::mark_recurring_contribution_Failed($contributionRecur);
-                } else {
-                    // send_receipt_email($new_contribution_record->id);
-                    $new_contribution_record['contribution_status_id'] = $completed_status_id;
-
-                    $new_contribution_record['is_email_receipt'] = 0;
-
-                    if ($contributionRecur->failure_count > 0
-                        && $contributionRecur->contribution_status_id == $failed_status_id) {
-                        // Failed recurring contributionRecur completed successfuly after several retry.
-                        self::update_recurring_contribution_status($next_sched_contribution_date, $contributionRecurID);
-                        CRM_Core_DAO::setFieldValue('CRM_Contribute_DAO_ContributionRecur',
-                            $contributionRecur->id,
-                            'contribution_status_id',
-                            $in_progress_status_id);
-
-                        try {
-                            civicrm_api3('Activity', 'create', [
-                                'source_contact_id' => $contributionRecur->contact_id,
-                                'activity_type_id' => 'Payment2c2p Transaction Succeeded',
-                                'source_record' => $contributionRecur->id,
-                                'details' => 'Transaction Succeeded after '
-                                    . $contributionRecur->failure_count . ' retries',
-                            ]);
-                        } catch (CiviCRM_API3_Exception $e) {
-                            \Civi::log()->debug('Payment2c2p Recurring: Couldn\'t record success activity: ' . $e->getMessage());
-                        }
-                    }
-
-                    CRM_Core_DAO::setFieldValue('CRM_Contribute_DAO_ContributionRecur',
-                        $contributionRecur->id, 'failure_count', 0);
-
-                    CRM_Core_DAO::setFieldValue('CRM_Contribute_DAO_ContributionRecur',
-                        $contributionRecur->id, 'failure_retry_date', '');
-                }
-
-                $api_action = (
-                $new_contribution_record['contribution_status_id'] == $completed_status_id
-                    ? 'completetransaction'
-                    : 'create'
-                );
-
-                $updated = civicrm_api3('Contribution', $api_action, $new_contribution_record);
-
-                $updated_contribution_record = reset($updated['values']);
-
-                // The invoice_id does not seem to be recorded by
-                // Contribution.completetransaction, so let's update it directly.
-                if ($api_action === 'completetransaction') {
-                    $updated = civicrm_api3('Contribution', 'create', [
-                        'id' => $updated_contribution_record['id'],
-                        'invoice_id' => $invoice_id,
-                    ]);
-                    $updated_contribution_record = reset($updated['values']);
-                }
-
-                if (count($responseErrors)) {
-                    $note = new CRM_Core_BAO_Note();
-
-                    $note->entity_table = 'civicrm_contribution';
-                    $note->contact_id = $contributionRecur->contact_id;
-                    $note->entity_id = $updated_contribution_record['id'];
-                    $note->subject = ts('Transaction Error');
-                    $note->note = implode("\n", $responseErrors);
-
-                    $note->save();
-                }
-
-                // Civi::log()->debug("Save contributionRecur with trxn_id {$new_contribution_record->trxn_id}");
-
-            } catch (Exception $e) {
-                Civi::log()->warning("Processing payment {$contributionRecur->id} for {$contributionRecur->contact_id}: " . $e->getMessage());
-
-                // already talk to payment2c2p? then we need to check the payment status
-                if ($p2c2pResponse['Status']) {
-                    $new_contribution_record['contribution_status_id'] = $pending_status_id;
-                } else {
-                    $new_contribution_record['contribution_status_id'] = $failed_status_id;
-                }
-
-                $updated = civicrm_api3('Contribution', 'create', $new_contribution_record);
-                $updated_contribution_record = reset($updated['values']);
-                // CIVIEWAY-147 there is an unknown system error that happen after civi talks to eway
-                // It might be a cache cleaning task happening at the same time that break this task
-                // Defer the query later to update the contributionRecur status
-                if ($p2c2pResponse['Status']) {
-//                    $ewayParams = [
-//                        'access_code' => $eWayResponse->TransactionID,
-//                        'contribution_id' => $new_contribution_record['id'],
-//                        'payment_processor_id' => $contributionRecur->payment_processor_id,
-//                    ];
-//                    civicrm_api3('EwayContributionTransactions', 'create', $ewayParams);
-                } else {
-                    // Just mark it failed when eWay have no info about this at all
-                    self::mark_recurring_contribution_Failed($contributionRecur);
-                }
-
-                $note = new CRM_Core_BAO_Note();
-
-                $note->entity_table = 'civicrm_contribution';
-                $note->contact_id = $contributionRecur->contact_id;
-                $note->entity_id = $updated_contribution_record['id'];
-                $note->subject = ts('Contribution Error');
-                $note->note = $e->getMessage();
-
-                $note->save();
             }
 
         }
 
         $lock->release();
         return TRUE;
+    }
+
+//    /**
+//     * @param $contributionRecurID
+//     * @param $currentContributionID
+//     * @param $contributionRecur
+//     * @param $madeContributionsFirst
+//     * @param $pending_status_id
+//     * @param $failed_status_id
+//     * @param $completed_status_id
+//     * @param $in_progress_status_id
+//     * @return array
+//     * @throws CiviCRM_API3_Exception
+//     */
+//    private static function processPresentContributionFromRecurring(
+//        $contributionRecur,
+//        $currentContribution,
+//        $pending_status_id,
+//        $failed_status_id,
+//        $completed_status_id,
+//        $in_progress_status_id
+//        ): array
+//    {
+//        try {
+//
+//            $new_contribution_record = $currentContribution;
+//            $contribution_recieve_date = CRM_Utils_Date::isoToMysql(date('Y-m-d H:i:s')); //todo
+//            Civi::log()->debug("Creating Contribution $invoice_id for $contributionRecurID contributionRecur record\n");
+//            $new_contribution_record['contact_id'] = $contributionRecur->contact_id;
+//            $new_contribution_record['receive_date'] = $contribution_recieve_date;
+//            $new_contribution_record['total_amount'] = $contributionTotalAmount;
+//            $new_contribution_record['contribution_recur_id'] = $contributionRecurID;
+//            $new_contribution_record['payment_instrument_id'] = $contributionRecur->payment_instrument_id;
+//            $new_contribution_record['invoice_id'] = $invoice_id;
+//            $new_contribution_record['invoice_number'] = $contributionRecur->invoice_id;
+//            $new_contribution_record['campaign_id'] = $contributionRecur->campaign_id;
+//            $new_contribution_record['financial_type_id'] = $contributionRecur->financial_type_id;
+//            $new_contribution_record['payment_processor'] = $contributionRecur->payment_processor_id;
+//            $new_contribution_record['payment_processor_id'] = $contributionRecur->payment_processor_id;
+//
+//
+//            $precedent = new CRM_Contribute_BAO_Contribution();
+//            $precedent->id = $madeContributionsFirst['id'];
+//
+//            $contributionSource = '';
+//            $contributionPageId = '';
+//            $contributionIsTest = 0;
+//
+//            if ($precedent->find(TRUE)) {
+//                $contributionSource = $precedent->source;
+//                $contributionPageId = $precedent->contribution_page_id;
+//                $contributionIsTest = $precedent->is_test;
+//            }
+//
+//            try {
+//                $financial_type = civicrm_api3(
+//                    'FinancialType', 'getsingle', [
+//                    'sequential' => 1,
+//                    'return' => "name",
+//                    'id' => $contributionRecur->financial_type_id,
+//                ]);
+//            } catch (CiviCRM_API3_Exception $e) { // Most likely due to FinancialType API not being available in < 4.5 - try DAO directly
+//                $ft_bao = new CRM_Financial_BAO_FinancialType();
+//                $ft_bao->id = $contributionRecur->financial_type_id;
+//                $found = $ft_bao->find(TRUE);
+//                $financial_type = (array)$ft_bao;
+//            }
+//
+//
+//            if (!isset($financial_type['name'])) {
+//                throw new Exception (
+//                    "Financial type could not be loaded for {$contributionRecur->id}"
+//                );
+//            }
+//
+//            $new_contribution_record['source'] = "Payment2c2p Recurring {$financial_type['name']}:\n{$contributionSource}";
+//            $new_contribution_record['contribution_page_id'] = $contributionPageId;
+//            $new_contribution_record['is_test'] = $contributionIsTest;
+//
+//            // Retrieve the eWAY token
+//
+////                if (!empty($contributionRecur->payment_token_id)) {
+////                    try {
+////                        $token = civicrm_api3('PaymentToken', 'getvalue', [
+////                            'return' => 'token',
+////                            'id' => $contributionRecur->payment_token_id,
+////                        ]);
+////                    } catch (CiviCRM_API3_Exception $e) {
+////                        $token = $contributionRecur->processor_id;
+////                    }
+////                } else {
+////                    $token = $contributionRecur->processor_id;
+////                }
+//
+////                if (!$token) {
+//////                    throw new CRM_Core_Exception(E::ts('No token found for Recurring Contribution %1', [1 => $contributionRecur->id]));
+////                }
+//
+//            $p2c2pResponse = self::getPaymentInquiryViaKeySignature($invoice_id);
+//            CRM_Core_Error::debug_var('p2c2pResponseToDo', $p2c2pResponse);
+//            $p2c2pResponse = [];//@todo
+//            $p2c2pResponse['TransactionID'] = $invoice_id;//@todo
+//            $p2c2pResponse['Errors'] = [];//@todo
+//            $p2c2pResponse['ResponseMessages'] = [];//@todo
+//            $p2c2pResponse['Status'] = TRUE;//@todo
+//            $new_contribution_record['trxn_id'] = $p2c2pResponse['TransactionID'];
+//
+//            $responseErrors = $p2c2pResponse['Errors'];
+//
+//            if ($p2c2pResponse['Status']) {
+//                $responseMessages = $p2c2pResponse['ResponseMessages']; //@todo
+//                $responseErrors = array_merge($responseMessages, $responseErrors);
+//            }
+//
+//            if (count($responseErrors)) {
+//                // Mark transaction as failed
+//                $new_contribution_record['contribution_status_id'] = $failed_status_id;
+//                self::mark_recurring_contribution_Failed($contributionRecur);
+//            } else {
+//                // send_receipt_email($new_contribution_record->id);
+//                $new_contribution_record['contribution_status_id'] = $completed_status_id;
+//
+//                $new_contribution_record['is_email_receipt'] = 0;
+//
+//                if ($contributionRecur->failure_count > 0
+//                    && $contributionRecur->contribution_status_id == $failed_status_id) {
+//                    // Failed recurring contributionRecur completed successfuly after several retry.
+//                    self::update_recurring_contribution_status($next_sched_contribution_date, $contributionRecurID);
+//                    CRM_Core_DAO::setFieldValue('CRM_Contribute_DAO_ContributionRecur',
+//                        $contributionRecur->id,
+//                        'contribution_status_id',
+//                        $in_progress_status_id);
+//
+//                    try {
+//                        civicrm_api3('Activity', 'create', [
+//                            'source_contact_id' => $contributionRecur->contact_id,
+//                            'activity_type_id' => 'Payment2c2p Transaction Succeeded',
+//                            'source_record' => $contributionRecur->id,
+//                            'details' => 'Transaction Succeeded after '
+//                                . $contributionRecur->failure_count . ' retries',
+//                        ]);
+//                    } catch (CiviCRM_API3_Exception $e) {
+//                        \Civi::log()->debug('Payment2c2p Recurring: Couldn\'t record success activity: ' . $e->getMessage());
+//                    }
+//                }
+//
+//                CRM_Core_DAO::setFieldValue('CRM_Contribute_DAO_ContributionRecur',
+//                    $contributionRecur->id, 'failure_count', 0);
+//
+//                CRM_Core_DAO::setFieldValue('CRM_Contribute_DAO_ContributionRecur',
+//                    $contributionRecur->id, 'failure_retry_date', '');
+//            }
+//
+//            $api_action = (
+//            $new_contribution_record['contribution_status_id'] == $completed_status_id
+//                ? 'completetransaction'
+//                : 'create'
+//            );
+//
+//            $updated = civicrm_api3('Contribution', $api_action, $new_contribution_record);
+//
+//            $updated_contribution_record = reset($updated['values']);
+//
+//            // The invoice_id does not seem to be recorded by
+//            // Contribution.completetransaction, so let's update it directly.
+//            if ($api_action === 'completetransaction') {
+//                $updated = civicrm_api3('Contribution', 'create', [
+//                    'id' => $updated_contribution_record['id'],
+//                    'invoice_id' => $invoice_id,
+//                ]);
+//                $updated_contribution_record = reset($updated['values']);
+//            }
+//
+//            if (count($responseErrors)) {
+//                $note = new CRM_Core_BAO_Note();
+//
+//                $note->entity_table = 'civicrm_contribution';
+//                $note->contact_id = $contributionRecur->contact_id;
+//                $note->entity_id = $updated_contribution_record['id'];
+//                $note->subject = ts('Transaction Error');
+//                $note->note = implode("\n", $responseErrors);
+//
+//                $note->save();
+//            }
+//
+//            // Civi::log()->debug("Save contributionRecur with trxn_id {$new_contribution_record->trxn_id}");
+//
+//        } catch (Exception $e) {
+//            Civi::log()->warning("Processing payment {$contributionRecur->id} for {$contributionRecur->contact_id}: " . $e->getMessage());
+//
+//            // already talk to payment2c2p? then we need to check the payment status
+//            if ($p2c2pResponse['Status']) {
+//                $new_contribution_record['contribution_status_id'] = $pending_status_id;
+//            } else {
+//                $new_contribution_record['contribution_status_id'] = $failed_status_id;
+//            }
+//
+//            $updated = civicrm_api3('Contribution', 'create', $new_contribution_record);
+//            $updated_contribution_record = reset($updated['values']);
+//            // CIVIEWAY-147 there is an unknown system error that happen after civi talks to eway
+//            // It might be a cache cleaning task happening at the same time that break this task
+//            // Defer the query later to update the contributionRecur status
+//            if ($p2c2pResponse['Status']) {
+////                    $ewayParams = [
+////                        'access_code' => $eWayResponse->TransactionID,
+////                        'contribution_id' => $new_contribution_record['id'],
+////                        'payment_processor_id' => $contributionRecur->payment_processor_id,
+////                    ];
+////                    civicrm_api3('EwayContributionTransactions', 'create', $ewayParams);
+//            } else {
+//                // Just mark it failed when eWay have no info about this at all
+//                self::mark_recurring_contribution_Failed($contributionRecur);
+//            }
+//
+//            $note = new CRM_Core_BAO_Note();
+//
+//            $note->entity_table = 'civicrm_contribution';
+//            $note->contact_id = $contributionRecur->contact_id;
+//            $note->entity_id = $updated_contribution_record['id'];
+//            $note->subject = ts('Contribution Error');
+//            $note->note = $e->getMessage();
+//
+//            $note->save();
+//        }
+//        return array($e, $note);
+//    }
+
+    /**
+     * @param $contributionRecur
+     * @param $currentContribution
+     * @param $apiContribution
+     * @param $pending_status_id
+     * @param $failed_status_id
+     * @param $completed_status_id
+     * @param $in_progress_status_id
+     * @return array
+     * @throws CiviCRM_API3_Exception
+     */
+    public static function processNewContributionFromRecurring(
+        $invoice_id,
+        $contributionRecur,
+        $firstContribution,
+        $apiContribution): array
+    {
+
+        $completed_status_id = self::contribution_status_id('Completed');
+        $pending_status_id = self::contribution_status_id('Pending');
+        $cancelled_status_id = self::contribution_status_id('Cancelled');
+        $failed_status_id = self::contribution_status_id('Failed');
+        $in_progress_status_id = self::contribution_status_id('In Progress');
+        $overdue_status_id = self::contribution_status_id('Overdue');
+        $refunded_status_id = self::contribution_status_id('Refunded');
+        $partially_paid_status_id = self::contribution_status_id('Partially paid');
+        $pending_refund_status_id = self::contribution_status_id('Pending refund');
+        $chargeback_paid_status_id = self::contribution_status_id('Chargeback');
+        $template_paid_status_id = self::contribution_status_id('Template');
+        $apiContributionRespStatus = $apiContribution['respCode'];
+        $apiContributionStatus = $apiContribution['status'];
+        $contributionRecurID = $contributionRecur->id;
+        $updated_contribution_record = [];
+        $new_contribution_record = [];
+//        CRM_Core_Error::debug_var('invoice_id', $invoice_id);
+//        CRM_Core_Error::debug_var('contributionRecur', $contributionRecur);
+//        CRM_Core_Error::debug_var('firstContribution', $firstContribution);
+//        CRM_Core_Error::debug_var('apiContribution', $apiContribution);
+//        CRM_Core_Error::debug_var('updated_contribution_record1', $updated_contribution_record);
+        if (empty($firstContribution['tax_amount'])) {
+            $firstContribution['tax_amount'] = 0;
+        }
+        $madeContributionTaxAmount = $firstContribution['tax_amount'];
+        $contributionAmount = $contributionRecur->amount;
+        $contributionTotalAmount = $contributionAmount - $madeContributionTaxAmount;
+        $contribution_params = [
+            'contribution_recur_id' => $contributionRecurID,
+            'contribution_status_id' => $pending_status_id,
+            'total_amount' => $contributionTotalAmount,
+            'invoice_id' => $invoice_id,
+            'is_email_receipt' => 0,
+        ];
+
+        try {
+
+//                $madeContributionsFirst = $madeContributions[0];
+            try {
+                Civi::log()->info("Try to make repeat_contributionAPI");
+                $repeat_contributionAPI = civicrm_api3('Contribution', 'repeattransaction', $contribution_params);
+                $new_contribution_record_array = $repeat_contributionAPI['values'];
+                $repeat_contribution = array_shift($new_contribution_record_array);
+            } catch (CiviCRM_API3_Exception $e) {
+                Civi::log()->warning("Having error in repeattransaction payment {$contributionRecur->id} for {$contributionRecur->contact_id}: " . $e->getMessage());
+                $repeat_contribution = [];
+            }
+
+            $new_contribution_record = (array)$repeat_contribution;
+//            $new_contribution_record['id'] = $updated_contribution_record['id'];
+            Civi::log()->debug("Creating Contribution $invoice_id for $contributionRecurID contributionRecur record\n");
+            if (key_exists('transactionDateTime', $apiContribution)) {
+                $contribution_recieve_date = $apiContribution['transactionDateTime'];
+            }
+            if (!key_exists('transactionDateTime', $apiContribution)) {
+                $contribution_recieve_date = CRM_Utils_Date::isoToMysql(date('Y-m-d H:i:s'));
+            }
+            $new_contribution_record['receive_date'] = $contribution_recieve_date;
+            $new_contribution_record['contact_id'] = $contributionRecur->contact_id;
+            $new_contribution_record['total_amount'] = $contributionTotalAmount;
+            $new_contribution_record['financial_type_id'] = $contributionRecur->financial_type_id;
+            $new_contribution_record['contribution_recur_id'] = $contributionRecurID;
+            $new_contribution_record['payment_instrument_id'] = $contributionRecur->payment_instrument_id;
+            $new_contribution_record['invoice_id'] = $invoice_id;
+            $new_contribution_record['invoice_number'] = $contributionRecur->invoice_id;
+            $new_contribution_record['campaign_id'] = $contributionRecur->campaign_id;
+            $new_contribution_record['payment_processor'] = $contributionRecur->payment_processor_id;
+            $new_contribution_record['payment_processor_id'] = $contributionRecur->payment_processor_id;
+
+            $contributionSource = $firstContribution['contribution_source'];
+            $contributionPageId = $firstContribution['contribution_page_id'];
+            $contributionIsTest = $firstContribution['is_test'];
+            $financial_type = $firstContribution['financial_type'];
+
+            $new_contribution_record['source'] = "Payment2c2p Recurring {$financial_type}:\n{$contributionSource}";
+            $new_contribution_record['contribution_page_id'] = $contributionPageId;
+            $new_contribution_record['is_test'] = $contributionIsTest;
+            $new_contribution_record['trxn_id'] = $apiContribution['referenceNo'];
+            $new_contribution_record['is_email_receipt'] = 0;
+
+            if ($apiContributionRespStatus != '00') {
+                // Mark transaction as failed
+                $new_contribution_record['contribution_status_id'] = $failed_status_id;
+//                $new_contribution_record['is_email_receipt'] = 0;
+            }
+
+            if ($apiContributionRespStatus == '00') {
+                // send_receipt_email($new_contribution_record->id);
+                if ($apiContributionStatus == "S") {
+                    $new_contribution_record['contribution_status_id'] = $completed_status_id;
+                }
+                if ($apiContributionStatus == "A") {
+                    $new_contribution_record['contribution_status_id'] = $completed_status_id;
+                }
+                if ($apiContributionStatus == "V") {
+                    $new_contribution_record['contribution_status_id'] = $cancelled_status_id;
+                }
+                if (in_array($apiContributionStatus, [
+                    "AR",
+                    "FF",
+                    "IP",
+                    "ROE",
+                    "EX",
+                    "CTF"])) {
+                    $new_contribution_record['contribution_status_id'] = $failed_status_id;
+                }
+
+                if ($apiContributionStatus == "RF") {
+                    $new_contribution_record['contribution_status_id'] = $refunded_status_id;
+                }
+
+                if (in_array($apiContributionStatus, ["AP", "RP", "VP"])) {
+                    $new_contribution_record['contribution_status_id'] = $pending_status_id;
+                }
+
+                if ($apiContributionStatus == "RS") {
+                    $new_contribution_record['contribution_status_id'] = $in_progress_status_id;
+                }
+            }
+
+            $api_action = (
+            $new_contribution_record['contribution_status_id'] == $completed_status_id
+                ? 'completetransaction'
+                : 'create'
+            );
+//            CRM_Core_Error::debug_var('new_contribution_record', $new_contribution_record);
+//            CRM_Core_Error::debug_var('api_action', $api_action);
+            $updatedAPI = civicrm_api3('Contribution', $api_action, $new_contribution_record);
+            $updated_contribution_record = reset($updatedAPI['values']);
+//            CRM_Core_Error::debug_var('completed_contribution_record', $updated_contribution_record);
+
+            // Many things does not seem to be recorded by
+            // Contribution.completetransaction, so let's update it directly.
+            if ($api_action === 'completetransaction') {
+                $updatedAPI = civicrm_api3('Contribution', 'create', $new_contribution_record);
+                $updated_contribution_record = reset($updatedAPI['values']);
+//                CRM_Core_Error::debug_var('completed_saved_contribution_record', $updated_contribution_record);
+            }
+
+            if ($apiContributionRespStatus != '00') {
+                $note = new CRM_Core_BAO_Note();
+
+                $note->entity_table = 'civicrm_contribution';
+                $note->contact_id = $contributionRecur->contact_id;
+                $note->entity_id = $updated_contribution_record['id'];
+                $note->subject = ts('Transaction Error');
+                $note->note = "Check https://developer.2c2p.com/docs/response-code-payment-maintenance-result-code\n
+                Current error code for repeat_contributionAPI $invoice_id : $apiContributionRespStatus";
+                $note->save();
+            }
+
+            // Civi::log()->debug("Save contributionRecur with trxn_id {$new_contribution_record->trxn_id}");
+
+        } catch (Exception $e) {
+            Civi::log()->warning("Having error in Processing payment {$contributionRecur->id} for {$contributionRecur->contact_id}: " . $e->getMessage());
+            $new_contribution_record['contact_id'] = $contributionRecur->contact_id;
+            $new_contribution_record['total_amount'] = $contributionTotalAmount;
+            $new_contribution_record['financial_type_id'] = $contributionRecur->financial_type_id;
+
+            // already talk to payment2c2p? then we need to check the payment status
+            if ($apiContributionRespStatus == '00') {
+                $new_contribution_record['contribution_status_id'] = $pending_status_id;
+            } else {
+                $new_contribution_record['contribution_status_id'] = $failed_status_id;
+            }
+
+            $updatedAPI = civicrm_api3('Contribution', 'create', $new_contribution_record);
+            $updated_contribution_record = reset($updatedAPI['values']);
+            $note = new CRM_Core_BAO_Note();
+//            CRM_Core_Error::debug_var('updated_contribution_record4', $updated_contribution_record);
+
+            $note->entity_table = 'civicrm_contribution';
+            $note->contact_id = $contributionRecur->contact_id;
+            $note->entity_id = $updated_contribution_record['id'];
+            $note->subject = ts("Contribution Error for") . "  $invoice_id";
+            $note->note = $e->getMessage();
+            $note->save();
+        }
+        return $updated_contribution_record;
     }
 
 //    function process_2c2p_payment(
