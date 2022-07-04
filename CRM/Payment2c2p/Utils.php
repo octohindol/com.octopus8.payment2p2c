@@ -1546,10 +1546,12 @@ class CRM_Payment2c2p_Utils
                 Civi::log()->debug("Current Invoice Number to check for $contributionRecurID: $current_invoice_id\n");
                 //get contribution from CiviCRM
                 $currentContributionsAPI = civicrm_api3('Contribution', 'get', [
-                    'options' => ['limit' => 1, 'sort' => "id ASC"],
+//                    'options' => ['limit' => 0, 'sort' => "id ASC"],
                     'sequential' => 1,
-                    'invoice_id' => $current_invoice_id,
+                    'invoice_id' => (string) $current_invoice_id,
                 ]);
+            CRM_Core_Error::debug_var('currentContributionsAPI', $currentContributionsAPI);
+            CRM_Core_Error::debug_var('current_invoice_id', $current_invoice_id);
 
                 //get contribution from 2c2p
                 if ($currentContributionsAPI['count'] <= 0) {
@@ -1888,6 +1890,8 @@ class CRM_Payment2c2p_Utils
             $new_contribution_record['campaign_id'] = $contributionRecur->campaign_id;
             $new_contribution_record['payment_processor'] = $contributionRecur->payment_processor_id;
             $new_contribution_record['payment_processor_id'] = $contributionRecur->payment_processor_id;
+            $new_contribution_record['is_template'] = FALSE;
+            $new_contribution_record['non_deductable_amount'] = 0;
 
             $contributionSource = $firstContribution['contribution_source'];
             $contributionPageId = $firstContribution['contribution_page_id'];
