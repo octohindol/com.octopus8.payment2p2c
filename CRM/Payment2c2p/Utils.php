@@ -1890,7 +1890,7 @@ class CRM_Payment2c2p_Utils
             $new_contribution_record['campaign_id'] = $contributionRecur->campaign_id;
             $new_contribution_record['payment_processor'] = $contributionRecur->payment_processor_id;
             $new_contribution_record['payment_processor_id'] = $contributionRecur->payment_processor_id;
-            $new_contribution_record['is_template'] = FALSE;
+            $new_contribution_record['is_template'] = 0;
             $new_contribution_record['non_deductable_amount'] = 0;
 
             $contributionSource = $firstContribution['contribution_source'];
