@@ -449,15 +449,14 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
     }
 
     /**
-     * @todo
-     * Function handles Recurring Payments cron job.
-     *
      * @return bool
+     * @throws CRM_Core_Exception
+     * @throws CiviCRM_API3_Exception
      */
     function handlePaymentCron()
     {
-        return true;
-//        return CRM_Payment2c2p_Utils::process_recurring_payments($this->_paymentProcessor, $this);
+//        return true;
+        return CRM_Payment2c2p_Utils::process_recurring_payments($this->_paymentProcessor);
     }
     /*
      * 	This is the function which handles the response
@@ -666,8 +665,6 @@ class CRM_Core_Payment_Payment2c2p extends CRM_Core_Payment
         CRM_Core_DAO::executeQuery($query);
         CRM_Core_Error::statusBounce(ts($_POST['respDesc']) . ts('2c2p Error:') . 'error', $failureUrl, 'error');
     }
-
-
 
 
     /**
