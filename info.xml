@@ -15,13 +15,13 @@
     <url desc="Licensing">http://www.gnu.org/licenses/agpl-3.0.html</url>
   </urls>
   <releaseDate>2022-06-12</releaseDate>
-  <version>0.1.28 beta</version>
+  <version>1.0.1-nr</version>
   <develStage>alpha</develStage>
 
   <compatibility>
     <ver>5.9.0</ver>
   </compatibility>
-  <comments>This is a new, undeveloped module</comments>
+  <comments>This is a version before starting implementing recurring payments</comments>
   <classloader>
     <psr4 prefix="Civi\" path="Civi"/>
   </classloader>
